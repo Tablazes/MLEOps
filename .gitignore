@@ -26,3 +26,5 @@ Thumbs.db
 
 # DVC local
 /tmp/dvc-storage/
+
+docs/
