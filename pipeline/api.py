@@ -42,7 +42,7 @@ def find_keywords(text: str) -> list[dict]:
 
 # ── Sentiment model ────────────────────────────────────────────
 
-_MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "pipeline", "sentiment_model.pkl")
+_MODEL_PATH = os.path.join(os.path.dirname(__file__), "sentiment_model.pkl")
 _model = None
 
 

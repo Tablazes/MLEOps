@@ -11,4 +11,4 @@ dependencies = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["pipeline*", "api*"]
+include = ["pipeline*"]
