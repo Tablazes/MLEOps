@@ -1,0 +1,28 @@
+name: CT — Continuous Training
+
+on:
+  schedule:
+    - cron: "0 2 1 * *"
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reden voor hertraining"
+        required: true
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Retrain op seed-data
+        run: python pipeline/train.py --out pipeline/sentiment_model.pkl
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentiment-model
+          path: pipeline/sentiment_model.pkl
+          retention-days: 30
