@@ -1,10 +1,12 @@
-"""Train sentiment model (TF-IDF + Logistic Regression)."""
+"""Train sentiment model — lokaal (TF-IDF + LR) en federatief (FedAvg)."""
 import os
 import pickle
 import argparse
+import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
 
 _SEED_DATA = [
@@ -23,18 +25,63 @@ _SEED_DATA = [
 ]
 
 
-def train(texts: list[str], labels: list[int], output_path: str) -> None:
-    model = Pipeline([
+def _build() -> Pipeline:
+    return Pipeline([
         ("tfidf", TfidfVectorizer(ngram_range=(1, 2), max_features=5000)),
         ("clf",   LogisticRegression(max_iter=500, random_state=42)),
     ])
+
+
+def train(texts: list[str], labels: list[int], output_path: str,
+          val_texts: list[str] | None = None, val_labels: list[int] | None = None) -> dict:
+    model = _build()
     model.fit(texts, labels)
+    metrics: dict = {}
+    if val_texts:
+        preds = model.predict(val_texts)
+        metrics = {"accuracy": round(accuracy_score(val_labels, preds), 4),
+                   "f1":       round(f1_score(val_labels, preds, average="weighted"), 4)}
+        print(f"  Accuracy={metrics['accuracy']:.2%}  F1={metrics['f1']:.2%}")
     parent = os.path.dirname(output_path)
     if parent:
         os.makedirs(parent, exist_ok=True)
     with open(output_path, "wb") as f:
         pickle.dump(model, f)
     print(f"Model opgeslagen: {output_path}  ({len(texts)} voorbeelden)")
+    return metrics
+
+
+def federated_train(client_data: list[tuple[list[str], list[int]]],
+                    output_path: str, rounds: int = 3) -> None:
+    """FedAvg: train lokale modellen per client, middel de coëfficiënten.
+
+    Args:
+        client_data: Lijst van (texts, labels) per gesimuleerde client.
+        output_path: Pad voor het geaggregeerde model.
+        rounds:      Aantal federatieve rondes.
+    """
+    global_model = None
+    for ronde in range(1, rounds + 1):
+        coefs, intercepts = [], []
+        for texts, labels in client_data:
+            m = _build()
+            m.fit(texts, labels)
+            coefs.append(m.named_steps["clf"].coef_)
+            intercepts.append(m.named_steps["clf"].intercept_)
+        # FedAvg: gemiddeld over clients
+        global_model = _build()
+        all_texts = [t for texts, _ in client_data for t in texts]
+        all_labels = [l for _, labels in client_data for l in labels]
+        global_model.fit(all_texts, all_labels)            # fit voor vocabulaire
+        global_model.named_steps["clf"].coef_      = np.mean(coefs, axis=0)
+        global_model.named_steps["clf"].intercept_ = np.mean(intercepts, axis=0)
+        print(f"  Ronde {ronde}/{rounds} — {len(client_data)} clients gemiddeld")
+    parent = os.path.dirname(output_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(output_path, "wb") as f:
+        pickle.dump(global_model, f)
+    print(f"Federatief model opgeslagen: {output_path}")
 
 
 def _load_parquet(data_dir: str):

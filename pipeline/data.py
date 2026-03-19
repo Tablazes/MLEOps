@@ -1,4 +1,4 @@
-"""VitaCall data pipeline: bronze → silver → gold (IMDb sentiment)."""
+"""VitaCall data pipeline: bronze → silver → gold (IMDb, Common Voice, Sentiment140)."""
 from __future__ import annotations
 
 import logging
@@ -25,6 +25,47 @@ def get_spark(app: str = "VitaCall") -> SparkSession:
 # ── Bronze ─────────────────────────────────────────────────────
 
 IMDB_URL = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
+
+
+# ── Common Voice (batch + streaming bron) ──────────────────────
+
+def ingest_common_voice(spark: SparkSession, tsv_path: str, out: str) -> None:
+    """Bronze: Mozilla Common Voice NL → Parquet (batch ingestie)."""
+    (spark.read.option("header", "true").option("delimiter", "\t").option("quote", "").csv(tsv_path)
+     .withColumn("up_votes",   F.col("up_votes").cast("int"))
+     .withColumn("down_votes", F.col("down_votes").cast("int"))
+     .withColumn("duration",   F.col("duration").cast("double"))
+     .select("client_id", "path", "sentence", "up_votes", "down_votes", "age", "gender", "duration")
+     .write.mode("overwrite").parquet(out))
+
+
+def clean_audio(spark: SparkSession, bronze: str, out: str) -> None:
+    """Silver: duur filteren, nulls en dubbelen verwijderen."""
+    df = spark.read.parquet(bronze)
+    (df.filter((F.col("duration") >= 1.0) & (F.col("duration") <= 30.0)
+               & F.col("sentence").isNotNull() & (F.trim(F.col("sentence")) != ""))
+       .dropDuplicates(["client_id", "sentence"])
+       .write.mode("overwrite").parquet(out))
+
+
+# ── Sentiment140 (batch, 1.6M tweets) ─────────────────────────
+
+def ingest_sentiment140(spark: SparkSession, csv_path: str, out: str) -> None:
+    """Bronze: Sentiment140 CSV → Parquet (groot volume, streaming-achtige bron)."""
+    from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+    schema = StructType([
+        StructField("target", IntegerType(), False),
+        StructField("ids",    StringType(),  False),
+        StructField("date",   StringType(),  True),
+        StructField("flag",   StringType(),  True),
+        StructField("user",   StringType(),  True),
+        StructField("text",   StringType(),  False),
+    ])
+    (spark.read.option("header", "false").option("encoding", "ISO-8859-1")
+     .schema(schema).csv(csv_path)
+     .withColumn("label", (F.col("target") == 4).cast("int"))
+     .select("ids", "text", "label", "user", "date")
+     .write.mode("overwrite").parquet(out))
 
 
 def download_imdb(base_dir: str = "data") -> str:

@@ -7,7 +7,7 @@ import pytest
 
 from pipeline.api import find_keywords, predict
 from pipeline.data import clean_reviews, ingest_imdb
-from pipeline.train import _SEED_DATA, train
+from pipeline.train import _SEED_DATA, train, federated_train
 
 
 # ── find_keywords ──────────────────────────────────────────────
@@ -56,6 +56,31 @@ def test_train_maakt_model():
         path = f.name
     try:
         train(texts, labels, path)
+        assert os.path.getsize(path) > 0
+    finally:
+        os.unlink(path)
+
+def test_train_geeft_metrics():
+    texts  = [t for t, _ in _SEED_DATA]
+    labels = [1 if l == "pos" else 0 for _, l in _SEED_DATA]
+    with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+        path = f.name
+    try:
+        metrics = train(texts, labels, path, val_texts=texts, val_labels=labels)
+        assert "accuracy" in metrics and "f1" in metrics
+        assert 0.0 <= metrics["accuracy"] <= 1.0
+    finally:
+        os.unlink(path)
+
+def test_federated_train():
+    texts  = [t for t, _ in _SEED_DATA]
+    labels = [1 if l == "pos" else 0 for _, l in _SEED_DATA]
+    # Elke client krijgt beide klassen (gesimuleerd met dezelfde data)
+    clients = [(texts, labels), (texts, labels)]
+    with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as f:
+        path = f.name
+    try:
+        federated_train(clients, path, rounds=2)
         assert os.path.getsize(path) > 0
     finally:
         os.unlink(path)
