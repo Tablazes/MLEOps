@@ -1,0 +1,23 @@
+name: CD — VitaCall Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deployment target"
+        required: true
+        type: choice
+        options: [staging, production]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: pip install -e .
+      - name: Train model
+        run: python pipeline/train.py --data data/silver/imdb --out pipeline/sentiment_model.pkl
+      - name: Deploy API
+        run: echo "Deploy api/ naar ${{ inputs.target }}"
