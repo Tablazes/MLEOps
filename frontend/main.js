@@ -29,7 +29,7 @@ function startStaticServer(distPath) {
 
       fs.readFile(filePath, (err, data) => {
         if (err) {
-          // SPA fallback — serve index.html for unknown paths
+          // SPA fallback: serve index.html for unknown paths
           fs.readFile(path.join(distPath, 'index.html'), (_e, html) => {
             if (_e) { res.writeHead(404); res.end('Not found'); return }
             res.writeHead(200, { 'Content-Type': 'text/html' })
