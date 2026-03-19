@@ -6,8 +6,7 @@ import pandas as pd
 import pytest
 
 from pipeline.api import find_keywords, predict
-from pipeline.data import clean_reviews, ingest_imdb
-from pipeline.train import _SEED_DATA, train, federated_train
+from pipeline.data import clean_reviews, ingest_imdb, _SEED_DATA, train, federated_train
 
 
 # ── find_keywords ──────────────────────────────────────────────

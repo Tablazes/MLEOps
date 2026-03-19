@@ -1,6 +1,6 @@
 """Pytest configuratie: zorg dat sentiment_model.pkl bestaat vóór de tests."""
 import pytest
-from pipeline.train import _SEED_DATA, train
+from pipeline.data import _SEED_DATA, train
 
 MODEL_PATH = "pipeline/sentiment_model.pkl"
 
