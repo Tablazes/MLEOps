@@ -225,6 +225,8 @@ mark.medicatie { background: var(--amber-bg); color: var(--amber); padding: 1px 
 
 .ctrl-btn svg { width: 14px; height: 14px; }
 
+.controls-single { grid-template-columns: 1fr; }
+.ctrl-main { padding: 10px; }
 .ctrl-end {
   border-color: rgba(224,85,85,0.3);
   color: var(--red);
@@ -367,3 +369,377 @@ mark.medicatie { background: var(--amber-bg); color: var(--amber); padding: 1px 
   color: var(--green);
   background: rgba(76,175,80,0.08);
 }
+
+/* ── Status page ── */
+.status-page {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+.status-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.status-page-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.status-page-time {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.status-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.status-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.status-card-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dot-green { background: var(--green); }
+.dot-amber { background: var(--amber); }
+.dot-red { background: var(--red); }
+.status-card-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.status-card-detail {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.status-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.sc-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sc-btn:hover { border-color: var(--text-muted); color: var(--text); background: rgba(255,255,255,0.07); }
+.sc-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.sc-btn-active {
+  border-color: rgba(76,175,80,0.4);
+  color: var(--green);
+  background: rgba(76,175,80,0.1);
+}
+.sc-btn-active:hover { background: rgba(76,175,80,0.18); }
+.sc-btn-hold {
+  border-color: rgba(212,160,48,0.4);
+  color: var(--amber);
+  background: rgba(212,160,48,0.1);
+}
+.sc-btn-danger {
+  border-color: rgba(224,85,85,0.3);
+  color: var(--red);
+}
+.sc-btn-danger:hover { background: var(--red-bg); }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE APP — Telefoon bel-interface
+   ══════════════════════════════════════════════════════════════ */
+
+.mobile-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  background: linear-gradient(180deg, #1a1816 0%, #23211D 40%, #1E1C18 100%);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* ── Top status bar ── */
+.mobile-status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.mobile-carrier { color: var(--text-muted); }
+.mobile-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/* ── Caller section (mid screen) ── */
+.mobile-caller-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.mobile-incoming-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.mobile-ring-icon {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(76, 175, 80, 0.1);
+  border: 2px solid rgba(76, 175, 80, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+}
+.mobile-ring-icon svg {
+  width: 40px;
+  height: 40px;
+  color: var(--green);
+}
+.mobile-ring-icon.ringing {
+  animation: ringPulse 1.2s ease-in-out infinite;
+}
+.mobile-ring-icon.ended {
+  background: rgba(224, 85, 85, 0.1);
+  border-color: rgba(224, 85, 85, 0.25);
+}
+.mobile-ring-icon.ended svg { color: var(--red); }
+
+@keyframes ringPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(76,175,80,0.3); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(76,175,80,0); }
+}
+
+.mobile-caller-name {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.mobile-caller-number {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ── Active call indicator ── */
+.mobile-active-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  transition: color 0.3s;
+}
+.mobile-active-indicator.pulse { color: #7ddf80; }
+
+.mobile-active-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.mobile-timer {
+  font-size: 48px;
+  font-weight: 200;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  letter-spacing: 2px;
+}
+
+/* ── Waveform (mobile) ── */
+.mobile-wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 32px;
+  margin-top: 20px;
+}
+.mobile-wave-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--green);
+  opacity: 0.5;
+  animation: wave 0.5s ease-in-out infinite alternate;
+}
+.mobile-wave-paused .mobile-wave-bar {
+  animation-play-state: paused;
+  opacity: 0.15;
+}
+
+/* ── Bottom controls ── */
+.mobile-controls {
+  flex-shrink: 0;
+  padding: 24px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.mobile-answer-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-btn {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mobile-btn svg { width: 32px; height: 32px; }
+
+.mobile-btn-answer {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(76, 175, 80, 0.35);
+}
+.mobile-btn-answer:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 32px rgba(76, 175, 80, 0.5);
+}
+.mobile-btn-answer:active { transform: scale(0.95); }
+
+.mobile-btn-end {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 4px 24px rgba(224, 85, 85, 0.35);
+}
+.mobile-btn-end:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 32px rgba(224, 85, 85, 0.5);
+}
+.mobile-btn-end:active { transform: scale(0.95); }
+
+.mobile-btn-connecting {
+  background: rgba(76, 175, 80, 0.15);
+  border: 2px solid rgba(76, 175, 80, 0.3);
+  cursor: default;
+}
+
+.mobile-btn-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.mobile-btn-label-end { color: var(--red); }
+
+/* ── Action grid (mute, hold, speaker) ── */
+.mobile-action-grid {
+  display: flex;
+  justify-content: center;
+  gap: 36px;
+  width: 100%;
+}
+
+.mobile-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-btn-small {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.mobile-btn-small svg { width: 22px; height: 22px; }
+.mobile-btn-small:hover { background: rgba(255, 255, 255, 0.1); }
+.mobile-btn-small:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.mobile-btn-active {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.mobile-action-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mobile-end-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* ── Connecting spinner ── */
+.mobile-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(76, 175, 80, 0.2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── System message styling in desktop transcript ── */
+.msg-speaker.systeem { color: var(--text-dim); font-style: italic; }
