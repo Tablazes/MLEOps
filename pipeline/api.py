@@ -217,28 +217,3 @@ async def asr_endpoint(ws: WebSocket):
     await _run_asr_loop(ws, rec, on_final, on_partial)
 
 
-@app.websocket("/mobile-asr")
-async def mobile_asr_endpoint(ws: WebSocket):
-    await ws.accept()
-    rec = _make_recognizer()
-    if rec is None:
-        await ws.send_text(json.dumps({"type": "error", "message": "Vosk model niet gevonden"}))
-        await ws.close()
-        return
-
-    await ws.send_text(json.dumps({"type": "connected"}))
-    await _broadcast({"type": "mobile_connected"})
-
-    async def on_final(text):
-        await _broadcast({"type": "mobile_transcript", "text": text, "source": "mobile"})
-        sentiment, confidence = predict(text)
-        _window.append(1 if sentiment == "positief" else 0)
-        await _broadcast({"type": "analysis", "sentiment": sentiment, "confidence": confidence,
-                          "keywords": find_keywords(text), "drift": _drift_snapshot(), "source": "mobile"})
-        await ws.send_text(json.dumps({"type": "speech_detected"}))
-
-    async def on_partial(text):
-        await _broadcast({"type": "mobile_partial", "text": text, "source": "mobile"})
-
-    await _run_asr_loop(ws, rec, on_final, on_partial)
-    await _broadcast({"type": "mobile_disconnected"})

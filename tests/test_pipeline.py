@@ -8,6 +8,14 @@ import pytest
 from pipeline.api import find_keywords, predict
 from pipeline.data import clean_reviews, ingest_imdb, _SEED_DATA, train, federated_train
 
+MODEL_PATH = "pipeline/sentiment_model.pkl"
+
+def pytest_configure(config):
+    if not os.path.exists(MODEL_PATH):
+        texts  = [t for t, _ in _SEED_DATA]
+        labels = [1 if l == "pos" else 0 for _, l in _SEED_DATA]
+        train(texts, labels, MODEL_PATH)
+
 
 # ── find_keywords ──────────────────────────────────────────────
 
