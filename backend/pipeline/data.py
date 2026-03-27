@@ -1,4 +1,3 @@
-"""VitaCall — datapipeline (bronze→silver→gold) + training + federatief leren."""
 import logging
 import os
 import pickle
@@ -20,8 +19,6 @@ except ImportError:
 
 logger = logging.getLogger("vitacall")
 
-# ── Seed-data ──────────────────────────────────────────────────
-
 _SEED_DATA = [
     ("goed","pos"),("prima","pos"),("beter","pos"),("rustig","pos"),
     ("geen klachten","pos"),("stabiel","pos"),("oké","pos"),("normaal","pos"),
@@ -37,7 +34,6 @@ _SEED_DATA = [
     ("pijn op de borst","neg"),("bloed verlies","neg"),
 ]
 
-# ── Model ──────────────────────────────────────────────────────
 
 def _build() -> Pipeline:
     return Pipeline([
@@ -68,7 +64,6 @@ def train(texts: list, labels: list, output_path: str,
 
 
 def federated_train(client_data: list, output_path: str, rounds: int = 3) -> None:
-    """FedAvg: middel modelgewichten over meerdere clients."""
     global_model = None
     for ronde in range(1, rounds + 1):
         coefs      = [_build().fit(t, l).named_steps["clf"].coef_      for t, l in client_data]
@@ -84,7 +79,6 @@ def federated_train(client_data: list, output_path: str, rounds: int = 3) -> Non
     with open(output_path, "wb") as f:
         pickle.dump(global_model, f)
 
-# ── Spark helpers ──────────────────────────────────────────────
 
 def get_spark(app: str = "VitaCall"):
     from pyspark.sql import SparkSession
@@ -94,7 +88,6 @@ def get_spark(app: str = "VitaCall"):
             .config("spark.driver.memory", "4g")
             .getOrCreate())
 
-# ── Bronze ─────────────────────────────────────────────────────
 
 IMDB_URL = "https://ai.stanford.edu/~amaas/data/sentiment/aclImdb_v1.tar.gz"
 
@@ -132,37 +125,6 @@ def ingest_imdb(imdb_dir: str, out: str) -> None:
         os.path.join(out, "imdb.parquet"), index=False)
 
 
-def ingest_common_voice(spark, tsv_path: str, out: str) -> None:
-    """Bronze: Mozilla Common Voice NL → Parquet."""
-    from pyspark.sql import functions as F
-    (spark.read.option("header", "true").option("delimiter", "\t").option("quote", "").csv(tsv_path)
-     .withColumn("up_votes",   F.col("up_votes").cast("int"))
-     .withColumn("down_votes", F.col("down_votes").cast("int"))
-     .withColumn("duration",   F.col("duration").cast("double"))
-     .select("client_id", "path", "sentence", "up_votes", "down_votes", "age", "gender", "duration")
-     .write.mode("overwrite").parquet(out))
-
-
-def ingest_sentiment140(spark, csv_path: str, out: str) -> None:
-    """Bronze: Sentiment140 (1.6M tweets) → Parquet."""
-    from pyspark.sql import functions as F
-    from pyspark.sql.types import StructType, StructField, StringType, IntegerType
-    schema = StructType([
-        StructField("target", IntegerType(), False),
-        StructField("ids",    StringType(),  False),
-        StructField("date",   StringType(),  True),
-        StructField("flag",   StringType(),  True),
-        StructField("user",   StringType(),  True),
-        StructField("text",   StringType(),  False),
-    ])
-    (spark.read.option("header", "false").option("encoding", "ISO-8859-1")
-     .schema(schema).csv(csv_path)
-     .withColumn("label", (F.col("target") == 4).cast("int"))
-     .select("ids", "text", "label", "user", "date")
-     .write.mode("overwrite").parquet(out))
-
-# ── Silver ─────────────────────────────────────────────────────
-
 def clean_reviews(bronze: str, out: str) -> None:
     df = pd.read_parquet(bronze)
     df["text_clean"] = (df["text"]
@@ -176,18 +138,7 @@ def clean_reviews(bronze: str, out: str) -> None:
     df.to_parquet(os.path.join(out, "imdb.parquet"), index=False)
 
 
-def clean_audio(spark, bronze: str, out: str) -> None:
-    """Silver: Common Voice — duur filteren, nulls en dubbelen verwijderen."""
-    from pyspark.sql import functions as F
-    (spark.read.parquet(bronze)
-     .filter((F.col("duration") >= 1.0) & (F.col("duration") <= 30.0)
-             & F.col("sentence").isNotNull() & (F.trim(F.col("sentence")) != ""))
-     .dropDuplicates(["client_id", "sentence"])
-     .write.mode("overwrite").parquet(out))
-
-# ── Gold ───────────────────────────────────────────────────────
-
-def create_sentiment_features(spark, silver: str, out: str, seed: int = 42) -> None:
+def create_features(spark, silver: str, out: str, seed: int = 42) -> None:
     from pyspark.sql import functions as F
     df = spark.read.parquet(silver)
     parts = []
@@ -200,10 +151,8 @@ def create_sentiment_features(spark, silver: str, out: str, seed: int = 42) -> N
      .withColumn("token_count", F.size(F.split(F.col("text_clean"), r"\s+")))
      .write.mode("overwrite").parquet(out))
 
-# ── Orchestrator ───────────────────────────────────────────────
 
 def run(base_dir: str = "data", model_out: str = "pipeline/sentiment_model.pkl") -> None:
-    """Volledige pipeline: Bronze → Silver → Gold → Train."""
     bronze = os.path.join(base_dir, "bronze", "imdb", "imdb.parquet")
     silver = os.path.join(base_dir, "silver", "imdb")
     gold   = os.path.join(base_dir, "gold",   "imdb")
@@ -212,21 +161,21 @@ def run(base_dir: str = "data", model_out: str = "pipeline/sentiment_model.pkl")
         os.makedirs(d, exist_ok=True)
 
     if not os.path.exists(bronze):
-        logger.info("Bronze: IMDb downloaden...")
+        logger.info("Ingestie: IMDb downloaden...")
         ingest_imdb(download_imdb(base_dir), os.path.dirname(bronze))
 
-    logger.info("Silver: cleaning...")
+    logger.info("Cleaning...")
     clean_reviews(bronze, silver)
 
-    logger.info("Gold: stratified splits...")
+    logger.info("Stratified splits...")
     spark = get_spark()
     spark.sparkContext.setLogLevel("WARN")
-    create_sentiment_features(spark, silver, gold)
+    create_features(spark, silver, gold)
     spark.stop()
 
     df = pd.read_parquet(gold)
     tr = df[df["split"] == "train"]
-    logger.info("Train: %d voorbeelden...", len(tr))
+    logger.info("Training: %d voorbeelden...", len(tr))
     train(tr["text_clean"].tolist(), tr["label"].tolist(), model_out)
 
 
