@@ -32,7 +32,7 @@ cd electron ; npm install ; npm start                  # native desktop window
 | LD2 Schaalbaarheid (streaming/Spark) | gevorderd  | 1.4 - 1.7                      | `evidence/scaling_benchmark.json`                    |
 | LD3 Modellering + tracking          | gevorderd  | 2.1 - 2.5                      | `models/*.pkl`, `mlruns/`, `evidence/model_card.md`  |
 | LD3+ Federated + Bayesian tuning    | excellent  | 2.6, 2.8                       | `models/sentiment_federated.pkl`                     |
-| LD3 Plots als bewijs                | basis      | 2.7                            | `evidence/{confusion_matrix,roc_curve,calibration}.png`, `evidence/model_comparison.csv` |
+| LD3 Plots                           | basis      | 2.7                            | `evidence/{confusion_matrix,roc_curve,calibration}.png`, `evidence/model_comparison.csv` |
 | LD4 Deployment (API + edge)         | gevorderd  | 3.1 - 3.3                      | `serve.py`, `Dockerfile`, `electron/`                |
 | LD4+ Docker-compose + integratie    | excellent  | 3.5 - 3.6                      | `docker-compose.yml`, `evidence/k8s_deployment.yaml`, `evidence/integration_audit.md` |
 | LD5 Monitoring + drift              | gevorderd  | 4.1 - 4.3                      | `evidence/drift_report.json`, `evidence/metrics.prom` |
