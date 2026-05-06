@@ -1,0 +1,34 @@
+services:
+  api:
+    build: .
+    image: vitacall:latest
+    container_name: vitacall-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/models/sentiment_heavy.pkl
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.17.0
+    container_name: vitacall-mlflow
+    command: mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri /mlruns
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlruns
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: vitacall-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped

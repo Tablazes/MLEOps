@@ -7,7 +7,11 @@ node_modules/
 data/
 *.tar.gz
 *.pkl
+!models/*.pkl
 .env
 artifacts/
 .pytest_cache/
 mlruns/
+main_executed.ipynb
+electron/dist/
+electron/node_modules/
