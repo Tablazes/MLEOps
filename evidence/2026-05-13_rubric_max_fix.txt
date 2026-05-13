@@ -1,5 +1,0 @@
-Rubric max-points cleanup:
-- .github/workflows/ct.yml: stale electron/src/sentiment_lite.json path -> models/sentiment_lite.json (LD4 +2)
-- .gitignore: added *.tgz + should
-- removed: should (empty stray file)
-Result: 98/100 -> 100/100 path unblocked.

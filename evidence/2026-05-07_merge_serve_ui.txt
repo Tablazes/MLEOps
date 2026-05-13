@@ -1,1 +1,0 @@
-SMOKE_OK serve_merged server_start=OK edge_model=loaded score_source=edge keywords=[pijn,borst]
