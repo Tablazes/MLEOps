@@ -122,8 +122,8 @@ class AnalyzeResponse(BaseModel):
 
 app = FastAPI(title="VitaCall API", version="2.0.0")
 
-# CORS open voor lokale Electron app + Vite dev-server. In productie
-# zou je dit beperken tot het exacte origin van de frontend.
+# CORS open voor lokale PySide6 desktop-app. In productie zou je dit
+# beperken tot het exacte origin van de frontend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

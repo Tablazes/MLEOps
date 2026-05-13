@@ -22,5 +22,3 @@ artifacts/
 .pytest_cache/
 mlruns/
 main_executed.ipynb
-electron/dist/
-electron/node_modules/

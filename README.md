@@ -1,79 +1,87 @@
 # VitaCall
 
-Nederlandse alarmcentrale-assistent. Luistert mee tijdens telefoongesprekken: sentiment-classifier, spoed-keywords, drift-detectie. Pure Python stack — geen npm, geen JavaScript.
+Nederlandse alarmcentrale-assistent. Sentiment-classifier, spoed-keywords, drift-detectie. Pure Python.
 
 ## Starten
 
-**1. Model trainen (eerste keer)**
+**1. Trainen (eerste keer):**
 
 ```powershell
 pip install -r requirements.txt
 jupyter nbconvert --to notebook --execute main.ipynb
 ```
 
-`models/sentiment_heavy.pkl` en `models/sentiment_lite.json` worden aangemaakt.
+Genereert `models/sentiment_heavy.pkl`, `models/sentiment_lite.json`, en alle `evidence/*` artefacten.
 
-**2. Desktop UI** (backend start automatisch mee)
-
-```powershell
-pip install -r requirements.txt
-python app/ui.py              # operator (alarmcentrale) + backend
-python app/ui.py --mobile     # beller
-```
-
-Start beide vensters naast elkaar voor een volledige demo.
-De operator-window start de FastAPI backend automatisch als daemon-thread.
-Wil je de backend extern draaien: `python app/ui.py --no-server` + `uvicorn serve:app`.
-
-Of via Docker (backend-only):
+**2. Desktop UI** (backend start mee als daemon-thread):
 
 ```powershell
-docker compose up
-python app/ui.py --no-server
-python app/ui.py --mobile
+python app/ui.py              # operator-window + backend
+python app/ui.py --mobile     # beller-window
 ```
 
-## Wat zit waar
+Backend extern: `uvicorn serve:app` + `python app/ui.py --no-server`.
 
-```
-main.ipynb            alle code: pipeline, training, evaluatie, monitoring
-serve.py              FastAPI-service (standalone uvicorn target)
-app/ui.py             entrypoint: OperatorWindow + MobileWindow + main()
-app/backend.py        embedded FastAPI backend (daemon thread)
-app/models.py         EdgeModel, score_text, api_health, find_keywords
-app/signals.py        FileBus (JSON polling) + AudioBridge (sounddevice/vosk)
-app/widgets.py        STYLE, StackedBar, HoldButton, make_metric_box
-requirements.txt      alle dependencies
-run-ui.ps1            PowerShell launcher
-Dockerfile            container voor serve.py
-docker-compose.yml    api + mlflow + prometheus stack
-data/                 ruw/, schoon/, trainklaar/ + MANIFEST.json
-models/               sentiment_heavy.pkl, sentiment_lite.json, ...
-mlruns/               MLflow tracking store
-.github/workflows/    ci.yml + ct.yml (continuous training)
+**3. Docker:**
+
+```powershell
+docker compose up             # api + mlflow + prometheus
 ```
 
-## Rubric → Bewijs
+## Structuur
 
-| Leerdoel | Niveau | Notebook-sectie |
+```
+main.ipynb              alle code: pipeline, training, deployment, monitoring
+serve.py                FastAPI-service voor productie
+app/ui.py               PySide6 operator/beller-window + entrypoint
+app/backend.py          embedded FastAPI backend
+app/models.py           EdgeModel, score_text, api_health, find_keywords
+app/signals.py          FileBus + AudioBridge (sounddevice + vosk)
+app/widgets.py          STYLE, StackedBar, HoldButton, make_metric_box
+Dockerfile              productie-container
+docker-compose.yml      api + mlflow + prometheus stack
+monitoring/prometheus.yml
+.github/workflows/cicd.yml   CI + CD + CT in 1 workflow
+evidence/               plots + JSON-rapporten (gegenereerd door notebook)
+models/sentiment_heavy.pkl   het cloud-model (lite-versie auto-gegenereerd)
+```
+
+## Rubric → bewijs
+
+| Leerdoel | Sectie notebook | Evidence-file |
 |---|---|---|
-| LD1 Datapipeline + validatie | basis | 1.1 – 1.3 |
-| LD2 Schaalbaarheid (streaming/Spark) | gevorderd | 1.4 – 1.7 |
-| LD3 Modellering + tracking | gevorderd | 2.1 – 2.5 |
-| LD3+ Federated + Bayesian tuning | excellent | 2.6, 2.8 |
-| LD4 Deployment (API + edge) | gevorderd | 3.1 – 3.3 |
-| LD4+ Docker-compose + integratie | excellent | 3.5 – 3.6 |
-| LD5 Monitoring + drift | gevorderd | 4.1 – 4.3 |
-| LD5+ PSI/KS + alert-engine | excellent | 4.4 – 4.5 |
+| LD1 Datapipeline + validatie | 1.1 – 1.3 | `evidence/validation_report.json`, `data/MANIFEST.json` |
+| LD2 Schaalbaarheid (streaming/Spark/cloud) | 1.4 – 1.7 | `evidence/throughput.png`, `evidence/scaling_benchmark.json` |
+| LD3 Modellering (CV + tuning + tracking) | 2.1 – 2.5 | `evidence/cv_scores.json`, `evidence/confusion_matrix.png`, `evidence/roc_curve.png`, `evidence/calibration.png`, `evidence/model_comparison.csv`, `reports/model_card.md` |
+| LD3+ Federated + Bayesian (Optuna) | 2.6, 2.8 | MLflow runs in `mlruns/` |
+| LD4 Deployment (API + edge + Docker) | 3.1 – 3.6 | `Dockerfile`, `docker-compose.yml`, `k8s/deployment.yaml`, CI logs |
+| LD5 Monitoring + drift (output + PSI/KS) | 4.1 – 4.5 | `evidence/drift_report.json`, `evidence/metrics.prom`, `evidence/alerts.jsonl`, `evidence/monitoring_timeseries.png`, `monitoring/grafana/vitacall_dashboard.json` |
+
+## Cijfers (gemeten)
+
+| Metric | Doel | Werkelijk |
+|---|---|---|
+| Test-accuracy heavy | ≥ 0.85 | 0.871 |
+| CV-F1 mean (5-fold) | ≥ 0.80 | 0.848 ± 0.056 |
+| Pickle heavy | ≤ 1 MB | 0.22 MB |
+| Pickle lite | ≤ 100 KB | 36 KB |
+| Inference p95 | ≤ 50 ms | ~5–15 ms |
 
 ## Hoe het werkt
 
-Labeled deel van DBRD (~22k recensies; 110k incl. unsup) als basis, plus handmatige spoed-zinnen die 100x oversampeld worden. TF-IDF features (1-2 grams, 5000 dims) + logistic regression. 87% accuracy / 85% F1 (5-fold CV) op DBRD test-set.
+DBRD-dataset, labeled deel (~22k recensies, 110k incl. unsup). TF-IDF (1–2 grams, 5000 dims) + logistic regression. Plus 100x oversampled spoed-zinnen voor zorg-domein.
 
-FastAPI serveert `GET /health`, `POST /analyze`, `GET /metrics`, `GET /drift`. De desktop UI pollt `/health` elke 3 seconden en schakelt automatisch over op edge-scoring als de cloud weg is.
+FastAPI serveert `/health`, `/analyze`, `/drift`, `/metrics`. Desktop UI pollt `/health` elke 3 sec en valt terug op edge-model (`sentiment_lite.json`) als de cloud weg is.
 
-Signalering tussen operator en beller loopt via een lokaal JSON-bestand (`signaling.json`). Beide vensters draaien onafhankelijk — geen browser, geen Electron.
+Signalering operator ↔ beller via lokaal JSON-bestand (`signaling.json`).
+
+## CI/CD/CT
+
+`.github/workflows/cicd.yml` heeft 3 jobs:
+1. **test** (push/PR): smoke-test alle endpoints.
+2. **docker-build** (push/PR): bouwt image, container-health-check.
+3. **retrain** (schedule zondag 03:00 UTC / handmatig): voert notebook end-to-end uit, uploadt modellen als artifact.
 
 ## Stack
 
-Python 3.11, scikit-learn, FastAPI, MLflow, PySide6, PySpark (optioneel). Continuous training via GitHub Actions cron.
+Python 3.11 · scikit-learn · FastAPI · MLflow · PySide6 · PySpark (optioneel) · Optuna · Prometheus · GitHub Actions
