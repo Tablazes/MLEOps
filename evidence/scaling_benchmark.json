@@ -1,0 +1,26 @@
+{
+  "engine": "pandas (fallback: Py4JJavaError)",
+  "results": [
+    {
+      "batch_size": 1000,
+      "rows": 22252,
+      "elapsed_s": 9.45,
+      "throughput_rps": 2353,
+      "rss_delta_mb": -77.4
+    },
+    {
+      "batch_size": 5000,
+      "rows": 22252,
+      "elapsed_s": 7.0,
+      "throughput_rps": 3178,
+      "rss_delta_mb": 36.5
+    },
+    {
+      "batch_size": 20000,
+      "rows": 22252,
+      "elapsed_s": 6.54,
+      "throughput_rps": 3404,
+      "rss_delta_mb": 5.8
+    }
+  ]
+}

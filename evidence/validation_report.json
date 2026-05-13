@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-05-13T17:15:38",
+  "git_sha": "24d2ef2",
+  "layers": [
+    {
+      "layer": "ruw",
+      "passed": true,
+      "rows": 22252,
+      "cols": 4,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "layer": "schoon",
+      "passed": true,
+      "rows": 22249,
+      "cols": 6,
+      "errors": [],
+      "warnings": []
+    },
+    {
+      "layer": "trainklaar",
+      "passed": true,
+      "rows": 22249,
+      "cols": 7,
+      "errors": [],
+      "warnings": []
+    }
+  ]
+}

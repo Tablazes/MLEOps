@@ -1,0 +1,3 @@
+{"name": "HighErrorRate", "severity": "critical", "condition": "error_rate > 5%", "fired_at": 1778686471.4032347}
+{"name": "HighLatency", "severity": "warning", "condition": "p95_latency > 500ms", "fired_at": 1778686471.403238}
+{"name": "ModelDrift", "severity": "warning", "condition": "drift_score > 0.3", "fired_at": 1778686471.4032395}

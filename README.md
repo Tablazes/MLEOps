@@ -68,7 +68,7 @@ mlruns/               MLflow tracking store
 
 ## Hoe het werkt
 
-110k Nederlandse boekenrecensies (DBRD) als basis, plus handmatige spoed-zinnen die 100x oversampeld worden. TF-IDF features (1-2 grams, 5000 dims) + logistic regression. ~87% F1 op DBRD test-set.
+Labeled deel van DBRD (~22k recensies; 110k incl. unsup) als basis, plus handmatige spoed-zinnen die 100x oversampeld worden. TF-IDF features (1-2 grams, 5000 dims) + logistic regression. 87% accuracy / 85% F1 (5-fold CV) op DBRD test-set.
 
 FastAPI serveert `GET /health`, `POST /analyze`, `GET /metrics`, `GET /drift`. De desktop UI pollt `/health` elke 3 seconden en schakelt automatisch over op edge-scoring als de cloud weg is.
 
