@@ -1,11 +1,11 @@
-"""VitaCall desktop UI: operator-dashboard + iPhone-style call-screen voor beller.
+"""VitaCall: operator-dashboard (passief, ontvangt) + caller-screen (initieert).
 
     python app/ui.py              # operator-dashboard + embedded backend
-    python app/ui.py --mobile     # beller-call-screen
-    python app/ui.py --no-server  # operator zonder backend (extern uvicorn)
+    python app/ui.py --mobile     # caller (beller-scherm)
+    python app/ui.py --mobile --api http://192.168.1.50:8000   # netwerk-pair
 
-Geen text-input meer: transcript komt van speech-to-text (Vosk-NL).
-Zonder Vosk wordt een demo-script afgespeeld zodat de UI altijd iets toont.
+Caller belt naar operator via HTTP. Operator luistert mee via mic en stuurt
+transcript-chunks naar de API; backend scoort sentiment + keywords.
 """
 from __future__ import annotations
 
@@ -19,7 +19,9 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from PySide6.QtCore import Qt, QTimer, Signal
+import requests
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -29,174 +31,135 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
-    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
 
 from app.backend import start_api_server
-from app.models import EdgeModel, api_health, find_keywords, score_text
-from app.signals import AudioBridge, FileBus
-from app.widgets import (
-    ACCENT,
-    IconButton,
-    NEG,
-    POS,
-    PulseDot,
-    SentimentBar,
-    STYLE,
-    StatCard,
-)
+from app.icons import make_icon_label
+from app.models import EdgeModel, find_keywords, score_text
+from app.signals import AudioBridge
+from app.widgets import NEG, POS, PulseDot, SentimentBar, STYLE, StatCard
 
 ROOT = Path(__file__).resolve().parent.parent
 LITE_MODEL_PATH = ROOT / "models" / "sentiment_lite.json"
 HEAVY_MODEL_PATH = ROOT / "models" / "sentiment_heavy.pkl"
-SIGNAL_FILE = ROOT / "signaling.json"
-VOSK_DIR = ROOT / "models" / "vosk-nl"
-
-DEMO_LINES = [
-    "hallo dit is de alarmcentrale",
-    "ik heb mijn moeder net gevonden",
-    "zij ligt op de grond",
-    "ze ademt heel zwaar",
-    "ik heb pijn op de borst",
-    "ze is bewusteloos",
-    "het lijkt op een hartaanval",
-    "ze heeft bloedverdunners",
-]
 
 
 class OperatorDashboard(QWidget):
-    """Operator-dashboard met live transcript, sentiment, stats en alarmen."""
+    """Passieve operator: ziet inkomende oproep + live transcript via API."""
 
-    def __init__(self, edge_model: EdgeModel | None) -> None:
+    def __init__(self, edge_model: EdgeModel | None, api_url: str) -> None:
         super().__init__()
-        self.setWindowTitle("VitaCall, alarmcentrale dashboard")
+        self.setWindowTitle("VitaCall, alarmcentrale")
         self.resize(1280, 800)
         self.setObjectName("shell")
         self.edge_model = edge_model
-        self.bus = FileBus("operator", SIGNAL_FILE)
-        self.bus.message.connect(self._on_bus_message)
-        self.audio = AudioBridge(VOSK_DIR)
+        self.api_url = api_url.rstrip("/")
+        self.audio = AudioBridge(Path("/__nonexistent__"))  # alleen mic-loopback
+        self.audio.transcript.connect(self._on_local_transcript)
         self.state = "idle"
-        self.caller_id = "anoniem"
+        self.caller_name = "geen oproep"
         self.timer_seconds = 0
-        self.transcript: list[dict] = []
         self.urgentie_count = 0
-        self.medicatie_count = 0
         self.pos_count = 0
         self.neg_count = 0
-        self._demo_idx = 0
+        self.transcript_history: list[dict] = []
+        self._last_event_count = 0
         self._build_ui()
         QTimer(self, timeout=self._tick, interval=1000).start()  # type: ignore[call-arg]
-        QTimer(self, timeout=self._refresh_health, interval=3000).start()  # type: ignore[call-arg]
-        self._refresh_health()
-        self._start_audio_or_demo()
+        QTimer(self, timeout=self._poll_state, interval=600).start()  # type: ignore[call-arg]
+        try:
+            self.audio.start()
+        except Exception:
+            pass
 
+    # ---- UI ----
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
         root.setContentsMargins(28, 22, 28, 22)
         root.setSpacing(18)
 
-        # Topbar
         top = QHBoxLayout()
-        top.setSpacing(12)
+        top.setSpacing(10)
         title = QLabel("Alarmcentrale")
         title.setObjectName("page_title")
         top.addWidget(title)
-        active = QLabel("Live")
-        active.setObjectName("pill_active")
-        top.addWidget(active)
+        self.live_pill = QLabel("WACHT")
+        self.live_pill.setObjectName("pill_idle")
+        top.addWidget(self.live_pill)
         top.addStretch(1)
-        self.health_pill = QLabel("CLOUD")
-        self.health_pill.setObjectName("pill_ok")
-        top.addWidget(self.health_pill)
-        export_btn = QPushButton("Export")
-        export_btn.setObjectName("cta_dark")
-        top.addWidget(export_btn)
+        export = QPushButton(" Export")
+        export.setObjectName("cta_dark")
+        export.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        top.addWidget(export)
         root.addLayout(top)
 
-        # Stats row: 4 stat-cards
         stats = QHBoxLayout()
         stats.setSpacing(14)
-        self.stat_calls = StatCard("Actieve gesprekken", "1", ACCENT)
+        self.stat_state = StatCard("Status", "Idle")
         self.stat_duration = StatCard("Gespreksduur", "00:00")
-        self.stat_urgentie = StatCard("Urgentie-keywords", "0", NEG)
+        self.stat_urgentie = StatCard("Urgentie hits", "0", NEG)
         self.stat_confidence = StatCard("Sentiment confidence", "0%")
-        stats.addWidget(self.stat_calls)
+        stats.addWidget(self.stat_state)
         stats.addWidget(self.stat_duration)
         stats.addWidget(self.stat_urgentie)
         stats.addWidget(self.stat_confidence)
         root.addLayout(stats)
 
-        # Main grid: live transcript (links) + alarmen + caller (rechts)
         grid = QGridLayout()
         grid.setSpacing(14)
 
-        # Live transcript card
-        transcript_card = QFrame()
-        transcript_card.setObjectName("card")
-        tl = QVBoxLayout(transcript_card)
+        # Transcript card
+        tc = QFrame()
+        tc.setObjectName("card")
+        tl = QVBoxLayout(tc)
         tl.setContentsMargins(20, 18, 20, 18)
         tl.setSpacing(10)
         th = QHBoxLayout()
-        th.setSpacing(8)
+        th.setSpacing(10)
         self.pulse = PulseDot()
         th.addWidget(self.pulse)
         tt = QLabel("Live transcript")
         tt.setObjectName("card_title")
         th.addWidget(tt)
         th.addStretch(1)
-        self.transcript_source = QLabel("speech-to-text")
+        self.transcript_source = QLabel("verbonden via mic")
         self.transcript_source.setObjectName("card_sub")
         th.addWidget(self.transcript_source)
         tl.addLayout(th)
         self.transcript_list = QListWidget()
         self.transcript_list.setFrameShape(QFrame.Shape.NoFrame)
         tl.addWidget(self.transcript_list, 1)
-
-        # Sentiment bar onder de transcript
         sb_label = QLabel("Stemming pos/neg")
         sb_label.setObjectName("stat_label")
         tl.addWidget(sb_label)
         self.sentiment_bar = SentimentBar()
         tl.addWidget(self.sentiment_bar)
+        grid.addWidget(tc, 0, 0, 2, 1)
 
-        grid.addWidget(transcript_card, 0, 0, 2, 1)
-
-        # Caller-info card
-        caller_card = QFrame()
-        caller_card.setObjectName("card")
-        cl = QVBoxLayout(caller_card)
+        # Caller card
+        cc = QFrame()
+        cc.setObjectName("card")
+        cl = QVBoxLayout(cc)
         cl.setContentsMargins(20, 18, 20, 18)
         cl.setSpacing(8)
-        ct = QLabel("Beller")
+        ct = QLabel("Inkomende oproep")
         ct.setObjectName("card_title")
         cl.addWidget(ct)
-        self.caller_label = QLabel(self.caller_id)
+        self.caller_label = QLabel(self.caller_name)
         self.caller_label.setObjectName("big_value")
         cl.addWidget(self.caller_label)
-        cs = QLabel("Inkomende oproep · regio onbekend")
-        cs.setObjectName("card_sub")
-        cl.addWidget(cs)
+        self.caller_sub = QLabel("geen actieve verbinding")
+        self.caller_sub.setObjectName("card_sub")
+        cl.addWidget(self.caller_sub)
         cl.addStretch(1)
-        actions = QHBoxLayout()
-        actions.setSpacing(10)
-        accept = QPushButton("Accepteer")
-        accept.setObjectName("cta_accent")
-        accept.clicked.connect(lambda: self._set_state("active"))
-        decline = QPushButton("Hang op")
-        decline.setObjectName("cta_dark")
-        decline.clicked.connect(lambda: self._set_state("idle"))
-        actions.addWidget(accept)
-        actions.addWidget(decline)
-        cl.addLayout(actions)
-        grid.addWidget(caller_card, 0, 1)
+        grid.addWidget(cc, 0, 1)
 
-        # Alarmen card
-        alarm_card = QFrame()
-        alarm_card.setObjectName("card")
-        al = QVBoxLayout(alarm_card)
+        # Alarm card
+        ac = QFrame()
+        ac.setObjectName("card")
+        al = QVBoxLayout(ac)
         al.setContentsMargins(20, 18, 20, 18)
         al.setSpacing(10)
         ah = QHBoxLayout()
@@ -211,7 +174,7 @@ class OperatorDashboard(QWidget):
         self.alarm_list = QListWidget()
         self.alarm_list.setFrameShape(QFrame.Shape.NoFrame)
         al.addWidget(self.alarm_list, 1)
-        grid.addWidget(alarm_card, 1, 1)
+        grid.addWidget(ac, 1, 1)
 
         grid.setColumnStretch(0, 2)
         grid.setColumnStretch(1, 1)
@@ -219,92 +182,90 @@ class OperatorDashboard(QWidget):
         grid.setRowStretch(1, 1)
         root.addLayout(grid, 1)
 
-    def _set_state(self, state: str) -> None:
-        self.state = state
-        if state == "idle":
+    # ---- State polling ----
+    def _poll_state(self) -> None:
+        try:
+            r = requests.get(f"{self.api_url}/call/state", timeout=0.7)
+            if not r.ok:
+                return
+            st = r.json()
+        except requests.RequestException:
+            return
+        was_active = self.state == "active"
+        is_active = bool(st.get("active"))
+        if is_active and not was_active:
+            self.state = "active"
+            self.caller_name = st.get("caller", "Onbekend")
+            self.caller_label.setText(self.caller_name)
+            self.caller_sub.setText("verbonden")
             self.timer_seconds = 0
-            self.transcript.clear()
             self.transcript_list.clear()
             self.alarm_list.clear()
             self.urgentie_count = 0
             self.pos_count = 0
             self.neg_count = 0
+            self._last_event_count = 0
+            self.live_pill.setText("LIVE")
+            self.live_pill.setObjectName("pill_active")
+            self.live_pill.style().unpolish(self.live_pill)
+            self.live_pill.style().polish(self.live_pill)
+            self.stat_state.set_value("Actief")
+        elif not is_active and was_active:
+            self._end_call()
+
+        events = st.get("events", [])
+        if len(events) > self._last_event_count:
+            for ev in events[self._last_event_count:]:
+                self._render_transcript_line(ev.get("text", ""))
+            self._last_event_count = len(events)
+            self._refresh_stats()
+
+    def _end_call(self) -> None:
+        self.state = "idle"
+        self.caller_name = "geen oproep"
+        self.caller_label.setText(self.caller_name)
+        self.caller_sub.setText("geen actieve verbinding")
+        self.live_pill.setText("WACHT")
+        self.live_pill.setObjectName("pill_idle")
+        self.live_pill.style().unpolish(self.live_pill)
+        self.live_pill.style().polish(self.live_pill)
+        self.stat_state.set_value("Idle")
 
     def _tick(self) -> None:
         if self.state == "active":
             self.timer_seconds += 1
             m, s = divmod(self.timer_seconds, 60)
             self.stat_duration.set_value(f"{m:02}:{s:02}")
-        self._refresh_stats()
-        self._maybe_advance_demo()
-
-    def _refresh_health(self) -> None:
-        ok = api_health()
-        self.health_pill.setText("CLOUD" if ok else "EDGE")
-        self.health_pill.setObjectName("pill_ok" if ok else "pill_off")
-        self.health_pill.style().unpolish(self.health_pill)
-        self.health_pill.style().polish(self.health_pill)
 
     def _refresh_stats(self) -> None:
-        self.stat_calls.set_value("1" if self.state == "active" else "0")
         self.stat_urgentie.set_value(str(self.urgentie_count))
         total = self.pos_count + self.neg_count
         if total > 0:
-            confs = [t.get("confidence", 0) for t in self.transcript if t.get("confidence")]
+            confs = [t.get("confidence", 0) for t in self.transcript_history if t.get("confidence")]
             avg = (sum(confs) / len(confs)) if confs else 0
             self.stat_confidence.set_value(f"{int(avg * 100)}%")
             self.sentiment_bar.set_pos(self.pos_count / total)
         else:
             self.stat_confidence.set_value("0%")
+            self.sentiment_bar.set_pos(0.5)
 
-    def _on_bus_message(self, msg: dict) -> None:
-        if msg.get("event") == "call_request":
-            self.caller_id = msg.get("caller", "anoniem")
-            self.caller_label.setText(self.caller_id)
-            self._set_state("active")
-            self._demo_idx = 0
-
-    # Audio of demo
-    def _start_audio_or_demo(self) -> None:
-        if VOSK_DIR.exists():
-            try:
-                self.audio.transcript.connect(self._on_audio_chunk)
-                started = self.audio.start()
-                self.transcript_source.setText("🎙  Vosk-NL live" if started else "demo (geen mic)")
-            except Exception:
-                self.transcript_source.setText("demo (audio-fail)")
-        else:
-            self.transcript_source.setText("demo (geen Vosk-NL)")
-
-    def _on_audio_chunk(self, text: str) -> None:
-        self._process_utterance(text)
-
-    def _maybe_advance_demo(self) -> None:
-        if VOSK_DIR.exists() or self.state != "active":
+    def _render_transcript_line(self, text: str) -> None:
+        if not text:
             return
-        if self.timer_seconds and self.timer_seconds % 3 == 0:
-            if self._demo_idx < len(DEMO_LINES):
-                self._process_utterance(DEMO_LINES[self._demo_idx])
-                self._demo_idx += 1
-
-    def _process_utterance(self, text: str) -> None:
         result = score_text(text, self.edge_model) or {}
         sentiment = result.get("sentiment", "?")
         confidence = result.get("confidence", 0.0)
         kws = result.get("keywords") or find_keywords(text)
-        row = {"text": text, "sentiment": sentiment, "confidence": confidence, "keywords": kws,
-               "time": datetime.now().strftime("%H:%M:%S")}
-        self.transcript.append(row)
+        row = {"text": text, "sentiment": sentiment, "confidence": confidence,
+               "keywords": kws, "time": datetime.now().strftime("%H:%M:%S")}
+        self.transcript_history.append(row)
         if sentiment == "positief":
             self.pos_count += 1
         elif sentiment == "negatief":
             self.neg_count += 1
 
-        from PySide6.QtGui import QColor
-        # transcript-row met dot-emoji passend bij dark mode
-        emoji = "🟢" if sentiment == "positief" else ("🔴" if sentiment == "negatief" else "⚫")
         kw_str = "  ".join(f"#{k['text']}" for k in kws[:3])
-        line = f" {row['time']}   {emoji}   {text}"
+        line = f"  {row['time']}    {text}"
         if kw_str:
             line += f"     {kw_str}"
         item = QListWidgetItem(line)
@@ -317,30 +278,37 @@ class OperatorDashboard(QWidget):
         self.transcript_list.addItem(item)
         self.transcript_list.scrollToBottom()
 
-        # alarms met medische emoji
         for kw in kws:
             if kw["type"] == "urgentie":
                 self.urgentie_count += 1
-                a = QListWidgetItem(f" 🚨   {kw['text'].upper()}        {row['time']}")
+                a = QListWidgetItem(f"  {kw['text'].upper()}        {row['time']}")
                 a.setForeground(QColor("#ff6b6b"))
                 self.alarm_list.addItem(a)
             elif kw["type"] == "medicatie":
-                a = QListWidgetItem(f" 💊   {kw['text']}        {row['time']}")
+                a = QListWidgetItem(f"  {kw['text']}        {row['time']}")
                 a.setForeground(QColor("#fbbf24"))
                 self.alarm_list.addItem(a)
         self.alarm_list.scrollToBottom()
 
+    def _on_local_transcript(self, text: str) -> None:
+        """Mic-input op operator-machine? Stuur naar API zodat caller-side ook ziet."""
+        if self.state != "active":
+            return
+        try:
+            requests.post(f"{self.api_url}/call/transcript", json={"text": text}, timeout=1)
+        except requests.RequestException:
+            pass
 
-# iPhone-style call screen voor de beller
-class MobileCallScreen(QWidget):
-    """iPhone-style inkomende-oproep scherm met decline/accept onderaan."""
 
-    def __init__(self) -> None:
+class CallerScreen(QWidget):
+    """iPhone-style call-scherm. Belt naar de API (operator)."""
+
+    def __init__(self, api_url: str) -> None:
         super().__init__()
-        self.setWindowTitle("VitaCall, beller")
+        self.setWindowTitle("VitaCall")
         self.resize(390, 780)
         self.setObjectName("mobile")
-        self.bus = FileBus("mobile", SIGNAL_FILE)
+        self.api_url = api_url.rstrip("/")
         self.state = "idle"
         self.timer_seconds = 0
         self._build_ui()
@@ -348,97 +316,86 @@ class MobileCallScreen(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 56, 28, 44)
+        root.setContentsMargins(32, 60, 32, 50)
         root.setSpacing(0)
 
-        # Notch-spacer
-        top_label = QLabel("Inkomende oproep")
-        top_label.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500;")
-        top_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root.addWidget(top_label)
+        self.status_top = QLabel("alarmcentrale")
+        self.status_top.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 15px;")
+        self.status_top.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.status_top)
 
-        root.addSpacing(10)
+        root.addSpacing(8)
 
-        self.caller_label = QLabel("VitaCall 112")
-        self.caller_label.setStyleSheet("color: white; font-size: 42px; font-weight: 600; letter-spacing: -1px;")
+        self.caller_label = QLabel("VitaCall")
+        self.caller_label.setStyleSheet("color: white; font-size: 44px; font-weight: 600; letter-spacing: -1.2px;")
         self.caller_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.caller_label)
 
-        self.status_label = QLabel("🚨  alarmcentrale")
-        self.status_label.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 15px; font-weight: 500;")
+        self.status_label = QLabel("klaar om te bellen")
+        self.status_label.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 14px;")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.status_label)
 
         root.addStretch(1)
 
-        # In-call action ring (mute, keypad, speaker, contact, facetime, message)
-        action_grid = QGridLayout()
-        action_grid.setHorizontalSpacing(24)
-        action_grid.setVerticalSpacing(28)
-        actions = [("🎤", "Mute"), ("🔢", "Keypad"), ("🔊", "Speaker"),
-                   ("➕", "Contact"), ("📹", "Video"), ("💬", "Bericht")]
-        for i, (icon, label) in enumerate(actions):
-            btn = QPushButton(icon)
-            btn.setObjectName("mob_action")
-            lbl = QLabel(label)
-            lbl.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 11px;")
-            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cell = QVBoxLayout()
-            cell.setSpacing(4)
-            cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cell.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
-            cell.addWidget(lbl)
-            wrap = QWidget()
-            wrap.setLayout(cell)
-            action_grid.addWidget(wrap, i // 3, i % 3, Qt.AlignmentFlag.AlignCenter)
-        root.addLayout(action_grid)
+        # Eén grote actie-knop in het midden (call / hangup)
+        btn_row = QHBoxLayout()
+        btn_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.call_btn = QPushButton()
+        self.call_btn.setObjectName("mob_accept")
+        self.call_btn.setIcon(make_icon_label("phone", 36).pixmap())
+        self.call_btn.setText("")
+        self._set_icon(self.call_btn, "phone", 36)
+        self.call_btn.clicked.connect(self._toggle_call)
+        btn_row.addWidget(self.call_btn)
+        root.addLayout(btn_row)
+
+        self.call_caption = QLabel("Bel alarmcentrale")
+        self.call_caption.setStyleSheet("color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;")
+        self.call_caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addSpacing(14)
+        root.addWidget(self.call_caption)
 
         root.addStretch(1)
 
-        self.subtitle = QLabel("Druk groen om te bellen")
-        self.subtitle.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 16px; font-weight: 500;")
-        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root.addWidget(self.subtitle)
+    def _set_icon(self, btn: QPushButton, kind: str, size: int) -> None:
+        lbl = make_icon_label(kind, size, color="#ffffff")
+        btn.setIcon(lbl.pixmap())
+        from PySide6.QtCore import QSize
+        btn.setIconSize(QSize(size, size))
 
-        root.addSpacing(18)
-
-        btns = QHBoxLayout()
-        btns.setSpacing(70)
-        btns.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.decline_btn = QPushButton("📵")
-        self.decline_btn.setObjectName("mob_decline")
-        self.decline_btn.clicked.connect(self._on_decline)
-        self.accept_btn = QPushButton("📞")
-        self.accept_btn.setObjectName("mob_accept")
-        self.accept_btn.clicked.connect(self._on_accept)
-        btns.addWidget(self.decline_btn)
-        btns.addWidget(self.accept_btn)
-        root.addLayout(btns)
-
-        labels = QHBoxLayout()
-        labels.setSpacing(70)
-        labels.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dl = QLabel("Ophangen")
-        dl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500;")
-        dl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        al = QLabel("Accepteer")
-        al.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500;")
-        al.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        labels.addWidget(dl)
-        labels.addWidget(al)
-        root.addLayout(labels)
-
-    def _on_accept(self) -> None:
-        self.state = "active"
-        self.timer_seconds = 0
-        self.bus.send({"event": "call_request", "caller": "Beller VitaCall"})
-        self.caller_label.setText("VitaCall 112")
-        self.subtitle.setText("In gesprek")
-
-    def _on_decline(self) -> None:
-        self.state = "idle"
-        self.timer_seconds = 0
-        self.subtitle.setText("Opgehangen")
+    def _toggle_call(self) -> None:
+        if self.state == "idle":
+            try:
+                r = requests.post(f"{self.api_url}/call/start",
+                                  json={"caller": "Beller"}, timeout=2)
+                if not r.ok:
+                    self.status_label.setText("kan operator niet bereiken")
+                    return
+            except requests.RequestException:
+                self.status_label.setText("offline, geen verbinding")
+                return
+            self.state = "active"
+            self.timer_seconds = 0
+            self.call_btn.setObjectName("mob_decline")
+            self.call_btn.style().unpolish(self.call_btn)
+            self.call_btn.style().polish(self.call_btn)
+            self._set_icon(self.call_btn, "phone_down", 36)
+            self.call_caption.setText("Hang op")
+            self.status_label.setText("verbonden")
+        else:
+            try:
+                requests.post(f"{self.api_url}/call/end", timeout=2)
+            except requests.RequestException:
+                pass
+            self.state = "idle"
+            self.timer_seconds = 0
+            self.call_btn.setObjectName("mob_accept")
+            self.call_btn.style().unpolish(self.call_btn)
+            self.call_btn.style().polish(self.call_btn)
+            self._set_icon(self.call_btn, "phone", 36)
+            self.call_caption.setText("Bel alarmcentrale")
+            self.status_label.setText("klaar om te bellen")
 
     def _tick(self) -> None:
         if self.state == "active":
@@ -449,21 +406,23 @@ class MobileCallScreen(QWidget):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mobile", action="store_true", help="open beller-call-screen")
+    parser.add_argument("--mobile", action="store_true", help="open beller-scherm")
     parser.add_argument("--no-server", action="store_true", help="start geen embedded backend")
+    parser.add_argument("--api", default="http://127.0.0.1:8000",
+                        help="API-URL (override voor netwerk-gebruik)")
     args = parser.parse_args()
 
     app = QApplication(sys.argv)
     app.setStyleSheet(STYLE)
 
     if args.mobile:
-        win: QWidget = MobileCallScreen()
+        win: QWidget = CallerScreen(args.api)
     else:
         if not args.no_server:
-            start_api_server(HEAVY_MODEL_PATH, "http://127.0.0.1:8000")
+            start_api_server(HEAVY_MODEL_PATH, args.api)
             time.sleep(1)
         edge = EdgeModel.load(LITE_MODEL_PATH)
-        win = OperatorDashboard(edge)
+        win = OperatorDashboard(edge, args.api)
 
     win.show()
     sys.exit(app.exec())

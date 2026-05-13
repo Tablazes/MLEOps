@@ -5,20 +5,19 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
 
-# Palet — pure dark mode, geen gradients.
-BG_DARK = "#0a0a0c"        # achtergrond beide vensters
-BG_CARD = "#16161a"        # cards
-BG_CARD_HI = "#1c1c20"     # subtiel verhoogd
+# Palet — dark, monochroom, minimaal accent.
+BG_DARK = "#0a0a0c"
+BG_CARD = "#141417"
+BG_CARD_HI = "#1a1a1d"
 BORDER = "#26262b"
 TEXT = "#f5f5f7"
 TEXT_DIM = "#8b8b94"
-ACCENT = "#ff8a00"         # oranje accent
-ACCENT_DIM = "#3a2410"
+ACCENT = "#9ca3af"         # neutraal grijs accent
 POS = "#10b981"
 POS_DIM = "#0b3127"
 NEG = "#ef4444"
 NEG_DIM = "#3a1414"
-WARN = "#f59e0b"
+WARN = "#a3a3a8"
 
 STYLE = f"""
 * {{ font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif; color: {TEXT}; }}
@@ -35,9 +34,9 @@ QFrame#card_hi {{
     border: 1px solid {BORDER};
 }}
 QFrame#card_alarm {{
-    background: {ACCENT_DIM};
+    background: {NEG_DIM};
     border-radius: 16px;
-    border: 1px solid {ACCENT};
+    border: 1px solid {NEG};
 }}
 QLabel#page_title {{ font-size: 26px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
 QLabel#page_sub   {{ font-size: 13px; color: {TEXT_DIM}; }}
@@ -47,8 +46,14 @@ QLabel#big_value  {{ font-size: 32px; font-weight: 700; color: {TEXT}; letter-sp
 QLabel#stat_label {{ font-size: 10px; color: {TEXT_DIM}; font-weight: 700; letter-spacing: 0.8px; }}
 QLabel#stat_value {{ font-size: 24px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
 QLabel#pill_active {{
-    background: {ACCENT}; color: #0a0a0c;
-    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 800;
+    background: {POS_DIM}; color: {POS};
+    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 700;
+    border: 1px solid {POS};
+}}
+QLabel#pill_idle {{
+    background: {BG_CARD_HI}; color: {TEXT_DIM};
+    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 700;
+    border: 1px solid {BORDER};
 }}
 QLabel#pill_ok {{
     background: {POS_DIM}; color: {POS};
@@ -67,10 +72,10 @@ QPushButton#cta_dark {{
 }}
 QPushButton#cta_dark:hover {{ background: {BORDER}; }}
 QPushButton#cta_accent {{
-    background: {ACCENT}; color: #0a0a0c;
+    background: white; color: #0a0a0c;
     border-radius: 22px; padding: 10px 22px; font-weight: 800; font-size: 13px;
 }}
-QPushButton#cta_accent:hover {{ background: #ffa033; }}
+QPushButton#cta_accent:hover {{ background: #e5e7eb; }}
 
 QLabel.alarm_title      {{ font-size: 14px; font-weight: 700; color: {NEG}; }}
 QLabel.alarm_title_warn {{ font-size: 14px; font-weight: 700; color: {WARN}; }}

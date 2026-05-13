@@ -108,9 +108,35 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     api = FastAPI(title="VitaCall API", version="2.0.0")
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
 
+    _call_state = {"active": False, "caller": "", "started_at": 0.0, "events": []}
+
     @api.get("/health")
     def health():  # noqa: ANN201
         return {"status": "healthy", "model_loaded": True}
+
+    @api.post("/call/start")
+    def call_start(payload: dict = None):  # noqa: ANN201, B006
+        name = (payload or {}).get("caller", "Onbekend")
+        _call_state.update({"active": True, "caller": name, "started_at": time.time(), "events": []})
+        return {"ok": True, "caller": name}
+
+    @api.post("/call/end")
+    def call_end():  # noqa: ANN201
+        _call_state.update({"active": False, "caller": "", "started_at": 0.0})
+        return {"ok": True}
+
+    @api.post("/call/transcript")
+    def call_transcript(payload: dict):  # noqa: ANN201
+        text = (payload or {}).get("text", "").strip()
+        if not text:
+            return {"ok": False}
+        _call_state["events"].append({"ts": time.time(), "text": text})
+        _call_state["events"] = _call_state["events"][-200:]
+        return {"ok": True}
+
+    @api.get("/call/state")
+    def call_state():  # noqa: ANN201
+        return _call_state
 
     @api.post("/analyze")
     def analyze(req: AnalyzeReq):  # noqa: ANN201
@@ -138,6 +164,6 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     def metrics_ep():  # noqa: ANN201
         return _metrics.snapshot()
 
-    threading.Thread(target=lambda: uvicorn.run(api, host="127.0.0.1", port=8000, log_level="warning"),
+    threading.Thread(target=lambda: uvicorn.run(api, host="0.0.0.0", port=8000, log_level="warning"),
                      daemon=True).start()
     log.warning("API backend gestart op %s", api_url)
