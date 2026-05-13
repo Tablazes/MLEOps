@@ -76,19 +76,27 @@ class _Drift:
                 "positive_rate": round(pos_rate, 3), "drift_score": round(score, 3), "samples": n}
 
 
+try:
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel, Field as PField
+    import uvicorn
+
+    class AnalyzeReq(BaseModel):
+        text: str = PField(..., min_length=1, max_length=10_000)
+
+    _FASTAPI_OK = True
+except ImportError:
+    _FASTAPI_OK = False
+
+
 def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     """Load heavy model + start uvicorn in daemon thread. No-op if pkl missing."""
     if not heavy_model_path.exists():
-        log.warning("heavy model niet gevonden (%s) — backend niet gestart", heavy_model_path)
+        log.warning("heavy model niet gevonden (%s), backend niet gestart", heavy_model_path)
         return
-
-    try:
-        from fastapi import FastAPI, HTTPException
-        from fastapi.middleware.cors import CORSMiddleware
-        from pydantic import BaseModel, Field as PField
-        import uvicorn
-    except ImportError:
-        log.warning("fastapi/uvicorn niet beschikbaar — backend niet gestart")
+    if not _FASTAPI_OK:
+        log.warning("fastapi/uvicorn niet beschikbaar, backend niet gestart")
         return
 
     with open(heavy_model_path, "rb") as fh:
@@ -99,9 +107,6 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
 
     api = FastAPI(title="VitaCall API", version="2.0.0")
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
-
-    class AnalyzeReq(BaseModel):
-        text: str = PField(..., min_length=1, max_length=10_000)
 
     @api.get("/health")
     def health():  # noqa: ANN201
