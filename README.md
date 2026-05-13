@@ -13,41 +13,42 @@ jupyter nbconvert --to notebook --execute main.ipynb
 
 `models/sentiment_heavy.pkl` en `models/sentiment_lite.json` worden aangemaakt.
 
-**2. Backend**
-
-```powershell
-uvicorn serve:app --host 127.0.0.1 --port 8000
-```
-
-Of via Docker:
-
-```powershell
-docker compose up
-```
-
-**3. Desktop UI**
+**2. Desktop UI** (backend start automatisch mee)
 
 ```powershell
 pip install -r requirements.txt
-python app/ui.py              # operator (alarmcentrale)
+python app/ui.py              # operator (alarmcentrale) + backend
 python app/ui.py --mobile     # beller
 ```
 
-Start beide vensters naast elkaar voor een volledige demo. De UI valt automatisch terug op het lokale edge-model als de backend offline is.
+Start beide vensters naast elkaar voor een volledige demo.
+De operator-window start de FastAPI backend automatisch als daemon-thread.
+Wil je de backend extern draaien: `python app/ui.py --no-server` + `uvicorn serve:app`.
+
+Of via Docker (backend-only):
+
+```powershell
+docker compose up
+python app/ui.py --no-server
+python app/ui.py --mobile
+```
 
 ## Wat zit waar
 
 ```
 main.ipynb            alle code: pipeline, training, evaluatie, monitoring
-serve.py              FastAPI-service (uvicorn target)
-app/ui.py             PySide6 desktop UI (operator + mobile view)
-requirements.txt      backend/notebook dependencies
-requirements-ui.txt   UI dependencies (PySide6, sounddevice, vosk)
-run-ui.ps1            PowerShell launcher voor de UI
+serve.py              FastAPI-service (standalone uvicorn target)
+app/ui.py             entrypoint: OperatorWindow + MobileWindow + main()
+app/backend.py        embedded FastAPI backend (daemon thread)
+app/models.py         EdgeModel, score_text, api_health, find_keywords
+app/signals.py        FileBus (JSON polling) + AudioBridge (sounddevice/vosk)
+app/widgets.py        STYLE, StackedBar, HoldButton, make_metric_box
+requirements.txt      alle dependencies
+run-ui.ps1            PowerShell launcher
 Dockerfile            container voor serve.py
 docker-compose.yml    api + mlflow + prometheus stack
 data/                 ruw/, schoon/, trainklaar/ + MANIFEST.json
-models/               sentiment_heavy.pkl, sentiment_lite.pkl, sentiment_federated.pkl, sentiment_lite.json
+models/               sentiment_heavy.pkl, sentiment_lite.json, ...
 mlruns/               MLflow tracking store
 .github/workflows/    ci.yml + ct.yml (continuous training)
 ```

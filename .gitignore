@@ -8,6 +8,7 @@ data/
 *.tar.gz
 *.tgz
 should
+PySide6
 *.pkl
 !models/*.pkl
 .env
