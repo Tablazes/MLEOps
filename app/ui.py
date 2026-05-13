@@ -45,7 +45,7 @@ from app.backend import start_api_server
 from app.icons import icon_size, qicon
 from app.models import EdgeModel, find_keywords, score_text
 from app.signals import AudioBridge
-from app.widgets import NEG, POS, PulseDot, SentimentBar, STYLE, StatCard
+from app.widgets import NEG, POS, SentimentBar, STYLE, StatCard
 
 ROOT = Path(__file__).resolve().parent.parent
 LITE_MODEL_PATH = ROOT / "models" / "sentiment_lite.json"
@@ -63,7 +63,9 @@ class OperatorDashboard(QWidget):
         self.api_url = api_url.rstrip("/")
         self.audio = AudioBridge(VOSK_DIR)
         self.audio.transcript.connect(self._on_local_transcript)
+        self.audio.partial.connect(self._on_local_partial)
         self._audio_started = False
+        self._current_call_id = 0
         self.phase = "idle"
         self.caller_name = ""
         self.timer_seconds = 0
@@ -74,7 +76,9 @@ class OperatorDashboard(QWidget):
         self._last_event_count = 0
         self._build_ui()
         QTimer(self, timeout=self._tick, interval=1000).start()  # type: ignore[call-arg]
-        QTimer(self, timeout=self._poll_state, interval=500).start()  # type: ignore[call-arg]
+        QTimer(self, timeout=self._poll_state, interval=400).start()  # type: ignore[call-arg]
+        QTimer(self, timeout=self._poll_history, interval=2000).start()  # type: ignore[call-arg]
+        self._poll_history()
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
@@ -112,7 +116,7 @@ class OperatorDashboard(QWidget):
         grid = QGridLayout()
         grid.setSpacing(14)
 
-        # Transcript card
+        # Transcript card (zonder pulse-dot)
         tc = QFrame()
         tc.setObjectName("card")
         tl = QVBoxLayout(tc)
@@ -120,8 +124,6 @@ class OperatorDashboard(QWidget):
         tl.setSpacing(10)
         th = QHBoxLayout()
         th.setSpacing(10)
-        self.pulse = PulseDot()
-        th.addWidget(self.pulse)
         tt = QLabel("Live transcript")
         tt.setObjectName("card_title")
         th.addWidget(tt)
@@ -133,6 +135,14 @@ class OperatorDashboard(QWidget):
         self.transcript_list = QListWidget()
         self.transcript_list.setFrameShape(QFrame.Shape.NoFrame)
         tl.addWidget(self.transcript_list, 1)
+        # Partial-regel: woord-voor-woord, dim grijs
+        self.partial_label = QLabel("")
+        self.partial_label.setStyleSheet(
+            "color: rgba(255,255,255,0.55); font-size: 13px; "
+            "font-style: italic; padding: 6px 4px;"
+        )
+        self.partial_label.setWordWrap(True)
+        tl.addWidget(self.partial_label)
         sb_label = QLabel("Stemming pos/neg")
         sb_label.setObjectName("stat_label")
         tl.addWidget(sb_label)
@@ -175,7 +185,10 @@ class OperatorDashboard(QWidget):
         cl.addLayout(actions)
         grid.addWidget(cc, 0, 1)
 
-        # Alarm card
+        # Alarm + history stack
+        right_split = QVBoxLayout()
+        right_split.setSpacing(14)
+
         ac = QFrame()
         ac.setObjectName("card")
         al = QVBoxLayout(ac)
@@ -193,7 +206,32 @@ class OperatorDashboard(QWidget):
         self.alarm_list = QListWidget()
         self.alarm_list.setFrameShape(QFrame.Shape.NoFrame)
         al.addWidget(self.alarm_list, 1)
-        grid.addWidget(ac, 1, 1)
+        right_split.addWidget(ac, 1)
+
+        # History card
+        hc = QFrame()
+        hc.setObjectName("card")
+        hl = QVBoxLayout(hc)
+        hl.setContentsMargins(20, 18, 20, 18)
+        hl.setSpacing(10)
+        hh = QHBoxLayout()
+        htitle = QLabel("Gespreksgeschiedenis")
+        htitle.setObjectName("card_title")
+        hh.addWidget(htitle)
+        hh.addStretch(1)
+        self.history_meta = QLabel("0 gesprekken")
+        self.history_meta.setObjectName("card_sub")
+        hh.addWidget(self.history_meta)
+        hl.addLayout(hh)
+        self.history_list = QListWidget()
+        self.history_list.setFrameShape(QFrame.Shape.NoFrame)
+        hl.addWidget(self.history_list, 1)
+        right_split.addWidget(hc, 1)
+
+        right_widget = QFrame()
+        right_widget.setLayout(right_split)
+        right_widget.setStyleSheet("QFrame { background: transparent; }")
+        grid.addWidget(right_widget, 1, 1)
 
         grid.setColumnStretch(0, 2)
         grid.setColumnStretch(1, 1)
@@ -209,7 +247,9 @@ class OperatorDashboard(QWidget):
         except requests.RequestException:
             return
         new_phase = st.get("phase", "idle")
-        if new_phase != self.phase:
+        new_call_id = st.get("call_id", 0)
+        if new_phase != self.phase or new_call_id != self._current_call_id:
+            self._current_call_id = new_call_id
             self._phase_change(new_phase, st.get("caller", ""))
         events = st.get("events", [])
         if len(events) > self._last_event_count and self.phase == "active":
@@ -217,6 +257,35 @@ class OperatorDashboard(QWidget):
                 self._render_transcript_line(ev.get("text", ""))
             self._last_event_count = len(events)
             self._refresh_stats()
+        # Partial-line update
+        partial = st.get("partial", "") if self.phase == "active" else ""
+        self.partial_label.setText(("… " + partial) if partial else "")
+
+    def _poll_history(self) -> None:
+        try:
+            r = requests.get(f"{self.api_url}/call/history", timeout=0.8)
+            if not r.ok:
+                return
+            data = r.json()
+        except requests.RequestException:
+            return
+        calls = data.get("calls", [])
+        self.history_meta.setText(f"{len(calls)} gesprekken")
+        # Re-render volledige lijst
+        self.history_list.clear()
+        for c in calls:
+            started = datetime.fromtimestamp(c.get("started_at", 0)).strftime("%H:%M") if c.get("started_at") else "--:--"
+            n_events = len(c.get("events", []))
+            urgentie = sum(1 for ev in c.get("events", [])
+                           for kw in find_keywords(ev.get("text", ""))
+                           if kw["type"] == "urgentie")
+            line = f"  #{c.get('call_id'):>2}   {started}   {c.get('caller','')}   {c.get('duration_s',0):.0f}s   {n_events} regels"
+            if urgentie:
+                line += f"   ⚠ {urgentie}"
+            item = QListWidgetItem(line)
+            if urgentie:
+                item.setForeground(QColor("#ff9999"))
+            self.history_list.addItem(item)
 
     def _phase_change(self, new_phase: str, caller: str) -> None:
         self.phase = new_phase
@@ -238,12 +307,24 @@ class OperatorDashboard(QWidget):
             self.phase_pill.setObjectName("pill_active")
             self.stat_state.set_value("Actief")
             self.timer_seconds = 0
-            self.transcript_list.clear()
             self.alarm_list.clear()
             self.urgentie_count = 0
             self.pos_count = 0
             self.neg_count = 0
             self._last_event_count = 0
+            # Call-separator i.p.v. transcript clearen: oude calls blijven zichtbaar
+            if self.transcript_list.count() > 0:
+                sep = QListWidgetItem(
+                    f"  ─────  CALL #{self._current_call_id} · {datetime.now().strftime('%H:%M:%S')}  ─────"
+                )
+                sep.setForeground(QColor("#6b7280"))
+                self.transcript_list.addItem(sep)
+            else:
+                hdr = QListWidgetItem(
+                    f"  CALL #{self._current_call_id} · {datetime.now().strftime('%H:%M:%S')}"
+                )
+                hdr.setForeground(QColor("#6b7280"))
+                self.transcript_list.addItem(hdr)
             self._start_audio_if_needed()
         else:  # idle
             self.caller_name = ""
@@ -348,6 +429,15 @@ class OperatorDashboard(QWidget):
         try:
             requests.post(f"{self.api_url}/call/transcript",
                           json={"text": text}, timeout=1)
+        except requests.RequestException:
+            pass
+
+    def _on_local_partial(self, text: str) -> None:
+        if self.phase != "active":
+            return
+        try:
+            requests.post(f"{self.api_url}/call/partial",
+                          json={"text": text}, timeout=0.5)
         except requests.RequestException:
             pass
 

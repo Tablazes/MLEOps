@@ -109,7 +109,9 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
 
     # Phase: "idle" -> "ringing" -> "active" -> "idle"
-    _call_state = {"phase": "idle", "caller": "", "started_at": 0.0, "events": []}
+    _call_state = {"phase": "idle", "caller": "", "started_at": 0.0,
+                   "events": [], "partial": "", "call_id": 0}
+    _call_history: list[dict] = []
 
     @api.get("/health")
     def health():  # noqa: ANN201
@@ -119,19 +121,33 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     def call_start(payload: dict = None):  # noqa: ANN201, B006
         name = (payload or {}).get("caller", "Onbekend")
         _call_state.update({"phase": "ringing", "caller": name,
-                            "started_at": 0.0, "events": []})
-        return {"ok": True, "phase": "ringing"}
+                            "started_at": 0.0, "events": [], "partial": "",
+                            "call_id": _call_state.get("call_id", 0) + 1})
+        return {"ok": True, "phase": "ringing", "call_id": _call_state["call_id"]}
 
     @api.post("/call/accept")
     def call_accept():  # noqa: ANN201
         if _call_state["phase"] != "ringing":
             return {"ok": False, "reason": "not ringing"}
-        _call_state.update({"phase": "active", "started_at": time.time()})
+        _call_state.update({"phase": "active", "started_at": time.time(), "partial": ""})
         return {"ok": True, "phase": "active"}
 
     @api.post("/call/end")
     def call_end():  # noqa: ANN201
-        _call_state.update({"phase": "idle", "caller": "", "started_at": 0.0})
+        # Archiveer in history voordat we reset.
+        if _call_state["phase"] in ("ringing", "active") and _call_state.get("events"):
+            duration = round(time.time() - _call_state["started_at"], 1) if _call_state["started_at"] else 0
+            _call_history.append({
+                "call_id": _call_state["call_id"],
+                "caller": _call_state["caller"],
+                "started_at": _call_state["started_at"],
+                "ended_at": time.time(),
+                "duration_s": duration,
+                "events": list(_call_state["events"]),
+            })
+            del _call_history[:-50]  # cap at 50 calls
+        _call_state.update({"phase": "idle", "caller": "", "started_at": 0.0,
+                            "events": [], "partial": ""})
         return {"ok": True}
 
     @api.post("/call/transcript")
@@ -143,14 +159,25 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
             return {"ok": False}
         _call_state["events"].append({"ts": time.time(), "text": text})
         _call_state["events"] = _call_state["events"][-200:]
+        _call_state["partial"] = ""
+        return {"ok": True}
+
+    @api.post("/call/partial")
+    def call_partial(payload: dict):  # noqa: ANN201
+        if _call_state["phase"] != "active":
+            return {"ok": False}
+        _call_state["partial"] = (payload or {}).get("text", "").strip()
         return {"ok": True}
 
     @api.get("/call/state")
     def call_state():  # noqa: ANN201
-        # backwards-compat: ook 'active' bool exposeren
         out = dict(_call_state)
         out["active"] = _call_state["phase"] == "active"
         return out
+
+    @api.get("/call/history")
+    def call_history():  # noqa: ANN201
+        return {"calls": list(reversed(_call_history))[:20]}
 
     @api.post("/analyze")
     def analyze(req: AnalyzeReq):  # noqa: ANN201

@@ -61,9 +61,10 @@ class FileBus(QObject):
 
 
 class AudioBridge(QObject):
-    """Mic → speakers loopback + optionele vosk STT."""
+    """Mic loopback + optionele vosk STT met partial-results (woord-voor-woord)."""
 
-    transcript = Signal(str)
+    transcript = Signal(str)         # final, complete utterance
+    partial = Signal(str)            # interim, still-being-spoken
 
     def __init__(self, vosk_model_dir: Path) -> None:
         super().__init__()
@@ -100,17 +101,25 @@ class AudioBridge(QObject):
 
         def _run() -> None:
             try:
+                import json as _json
                 import sounddevice as sd  # type: ignore[import-not-found]
                 model = Model(str(self._vosk_dir))
                 rec = KaldiRecognizer(model, 16000)
-                with sd.RawInputStream(samplerate=16000, blocksize=4000, dtype="int16", channels=1) as inp:
+                # Kleinere blocksize = sneller partial-update (~150ms i.p.v. 250ms).
+                with sd.RawInputStream(samplerate=16000, blocksize=2400, dtype="int16", channels=1) as inp:
+                    last_partial = ""
                     while not self._stop.is_set():
-                        data, _ = inp.read(4000)
+                        data, _ = inp.read(2400)
                         if rec.AcceptWaveform(bytes(data)):
-                            import json as _json
                             text = _json.loads(rec.Result()).get("text", "").strip()
+                            last_partial = ""
                             if text:
                                 self.transcript.emit(text)
+                        else:
+                            partial = _json.loads(rec.PartialResult()).get("partial", "").strip()
+                            if partial and partial != last_partial:
+                                last_partial = partial
+                                self.partial.emit(partial)
             except Exception:
                 return
 
