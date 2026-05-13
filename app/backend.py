@@ -108,7 +108,8 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     api = FastAPI(title="VitaCall API", version="2.0.0")
     api.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET", "POST"], allow_headers=["*"])
 
-    _call_state = {"active": False, "caller": "", "started_at": 0.0, "events": []}
+    # Phase: "idle" -> "ringing" -> "active" -> "idle"
+    _call_state = {"phase": "idle", "caller": "", "started_at": 0.0, "events": []}
 
     @api.get("/health")
     def health():  # noqa: ANN201
@@ -117,16 +118,26 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     @api.post("/call/start")
     def call_start(payload: dict = None):  # noqa: ANN201, B006
         name = (payload or {}).get("caller", "Onbekend")
-        _call_state.update({"active": True, "caller": name, "started_at": time.time(), "events": []})
-        return {"ok": True, "caller": name}
+        _call_state.update({"phase": "ringing", "caller": name,
+                            "started_at": 0.0, "events": []})
+        return {"ok": True, "phase": "ringing"}
+
+    @api.post("/call/accept")
+    def call_accept():  # noqa: ANN201
+        if _call_state["phase"] != "ringing":
+            return {"ok": False, "reason": "not ringing"}
+        _call_state.update({"phase": "active", "started_at": time.time()})
+        return {"ok": True, "phase": "active"}
 
     @api.post("/call/end")
     def call_end():  # noqa: ANN201
-        _call_state.update({"active": False, "caller": "", "started_at": 0.0})
+        _call_state.update({"phase": "idle", "caller": "", "started_at": 0.0})
         return {"ok": True}
 
     @api.post("/call/transcript")
     def call_transcript(payload: dict):  # noqa: ANN201
+        if _call_state["phase"] != "active":
+            return {"ok": False, "reason": "not active"}
         text = (payload or {}).get("text", "").strip()
         if not text:
             return {"ok": False}
@@ -136,7 +147,10 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
 
     @api.get("/call/state")
     def call_state():  # noqa: ANN201
-        return _call_state
+        # backwards-compat: ook 'active' bool exposeren
+        out = dict(_call_state)
+        out["active"] = _call_state["phase"] == "active"
+        return out
 
     @api.post("/analyze")
     def analyze(req: AnalyzeReq):  # noqa: ANN201
