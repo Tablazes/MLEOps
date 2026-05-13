@@ -267,9 +267,12 @@ class OperatorDashboard(QWidget):
     # Audio of demo
     def _start_audio_or_demo(self) -> None:
         if VOSK_DIR.exists():
-            self.audio.transcript.connect(self._on_audio_chunk)
-            self.audio.start()
-            self.transcript_source.setText("Vosk live")
+            try:
+                self.audio.transcript.connect(self._on_audio_chunk)
+                started = self.audio.start()
+                self.transcript_source.setText("🎙  Vosk-NL live" if started else "demo (geen mic)")
+            except Exception:
+                self.transcript_source.setText("demo (audio-fail)")
         else:
             self.transcript_source.setText("demo (geen Vosk-NL)")
 
@@ -297,27 +300,33 @@ class OperatorDashboard(QWidget):
         elif sentiment == "negatief":
             self.neg_count += 1
 
-        # transcript-row
-        emoji = "🟢" if sentiment == "positief" else ("🔴" if sentiment == "negatief" else "⚪")
-        kw_str = " · ".join(k["text"] for k in kws[:3])
-        line = f"{row['time']}   {emoji}  {text}"
+        from PySide6.QtGui import QColor
+        # transcript-row met dot-emoji passend bij dark mode
+        emoji = "🟢" if sentiment == "positief" else ("🔴" if sentiment == "negatief" else "⚫")
+        kw_str = "  ".join(f"#{k['text']}" for k in kws[:3])
+        line = f" {row['time']}   {emoji}   {text}"
         if kw_str:
-            line += f"    [{kw_str}]"
+            line += f"     {kw_str}"
         item = QListWidgetItem(line)
         if sentiment == "negatief":
-            item.setForeground(Qt.GlobalColor.darkRed)
+            item.setForeground(QColor("#ff6b6b"))
+        elif sentiment == "positief":
+            item.setForeground(QColor("#34d399"))
+        else:
+            item.setForeground(QColor("#d4d4d8"))
         self.transcript_list.addItem(item)
         self.transcript_list.scrollToBottom()
 
-        # alarms
+        # alarms met medische emoji
         for kw in kws:
             if kw["type"] == "urgentie":
                 self.urgentie_count += 1
-                a = QListWidgetItem(f"⚠  {kw['text'].upper()}    {row['time']}")
-                a.setForeground(Qt.GlobalColor.red)
+                a = QListWidgetItem(f" 🚨   {kw['text'].upper()}        {row['time']}")
+                a.setForeground(QColor("#ff6b6b"))
                 self.alarm_list.addItem(a)
             elif kw["type"] == "medicatie":
-                a = QListWidgetItem(f"💊  {kw['text']}    {row['time']}")
+                a = QListWidgetItem(f" 💊   {kw['text']}        {row['time']}")
+                a.setForeground(QColor("#fbbf24"))
                 self.alarm_list.addItem(a)
         self.alarm_list.scrollToBottom()
 
@@ -339,41 +348,64 @@ class MobileCallScreen(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 60, 28, 50)
+        root.setContentsMargins(28, 56, 28, 44)
         root.setSpacing(0)
 
+        # Notch-spacer
         top_label = QLabel("Inkomende oproep")
-        top_label.setProperty("class", "mob_label")
-        top_label.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 16px; font-weight: 500;")
+        top_label.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500;")
         top_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(top_label)
 
-        root.addSpacing(14)
+        root.addSpacing(10)
 
         self.caller_label = QLabel("VitaCall 112")
-        self.caller_label.setStyleSheet("color: white; font-size: 38px; font-weight: 600; letter-spacing: -1px;")
+        self.caller_label.setStyleSheet("color: white; font-size: 42px; font-weight: 600; letter-spacing: -1px;")
         self.caller_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.caller_label)
 
-        self.status_label = QLabel("alarmcentrale")
-        self.status_label.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 16px;")
+        self.status_label = QLabel("🚨  alarmcentrale")
+        self.status_label.setStyleSheet("color: rgba(255,255,255,0.5); font-size: 15px; font-weight: 500;")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.status_label)
 
         root.addStretch(1)
 
-        # Onderste actie-rij
-        self.subtitle = QLabel("Klik groen om te bellen")
-        self.subtitle.setStyleSheet("color: rgba(255,255,255,0.85); font-size: 17px;")
+        # In-call action ring (mute, keypad, speaker, contact, facetime, message)
+        action_grid = QGridLayout()
+        action_grid.setHorizontalSpacing(24)
+        action_grid.setVerticalSpacing(28)
+        actions = [("🎤", "Mute"), ("🔢", "Keypad"), ("🔊", "Speaker"),
+                   ("➕", "Contact"), ("📹", "Video"), ("💬", "Bericht")]
+        for i, (icon, label) in enumerate(actions):
+            btn = QPushButton(icon)
+            btn.setObjectName("mob_action")
+            lbl = QLabel(label)
+            lbl.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 11px;")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cell = QVBoxLayout()
+            cell.setSpacing(4)
+            cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cell.addWidget(btn, 0, Qt.AlignmentFlag.AlignCenter)
+            cell.addWidget(lbl)
+            wrap = QWidget()
+            wrap.setLayout(cell)
+            action_grid.addWidget(wrap, i // 3, i % 3, Qt.AlignmentFlag.AlignCenter)
+        root.addLayout(action_grid)
+
+        root.addStretch(1)
+
+        self.subtitle = QLabel("Druk groen om te bellen")
+        self.subtitle.setStyleSheet("color: rgba(255,255,255,0.8); font-size: 16px; font-weight: 500;")
         self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         root.addWidget(self.subtitle)
 
-        root.addSpacing(20)
+        root.addSpacing(18)
 
         btns = QHBoxLayout()
-        btns.setSpacing(60)
+        btns.setSpacing(70)
         btns.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.decline_btn = QPushButton("✕")
+        self.decline_btn = QPushButton("📵")
         self.decline_btn.setObjectName("mob_decline")
         self.decline_btn.clicked.connect(self._on_decline)
         self.accept_btn = QPushButton("📞")
@@ -384,13 +416,13 @@ class MobileCallScreen(QWidget):
         root.addLayout(btns)
 
         labels = QHBoxLayout()
-        labels.setSpacing(60)
+        labels.setSpacing(70)
         labels.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dl = QLabel("Decline")
-        dl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px;")
+        dl = QLabel("Ophangen")
+        dl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500;")
         dl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        al = QLabel("Accept")
-        al.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px;")
+        al = QLabel("Accepteer")
+        al.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500;")
         al.setAlignment(Qt.AlignmentFlag.AlignCenter)
         labels.addWidget(dl)
         labels.addWidget(al)

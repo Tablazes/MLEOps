@@ -5,99 +5,103 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
 
-# Palet (flat, geen gradients).
-BG_LIGHT = "#f4f5f7"      # operator-achtergrond
-BG_CARD = "#ffffff"       # cards in operator
-BG_DARK = "#101012"       # mobile-achtergrond
-TEXT = "#0a0a0c"
-TEXT_DIM = "#6b6b73"
-TEXT_INV = "#f5f5f7"
-ACCENT = "#ff8a00"        # oranje, zoals foto 3
-ACCENT_BG = "#fff1de"
+# Palet — pure dark mode, geen gradients.
+BG_DARK = "#0a0a0c"        # achtergrond beide vensters
+BG_CARD = "#16161a"        # cards
+BG_CARD_HI = "#1c1c20"     # subtiel verhoogd
+BORDER = "#26262b"
+TEXT = "#f5f5f7"
+TEXT_DIM = "#8b8b94"
+ACCENT = "#ff8a00"         # oranje accent
+ACCENT_DIM = "#3a2410"
 POS = "#10b981"
+POS_DIM = "#0b3127"
 NEG = "#ef4444"
+NEG_DIM = "#3a1414"
 WARN = "#f59e0b"
 
 STYLE = f"""
 * {{ font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif; color: {TEXT}; }}
 
-/* Operator dashboard - light theme */
-QWidget#shell {{ background: {BG_LIGHT}; }}
-QWidget#topbar {{ background: {BG_LIGHT}; }}
+QWidget#shell {{ background: {BG_DARK}; }}
 QFrame#card {{
     background: {BG_CARD};
     border-radius: 16px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid {BORDER};
 }}
-QFrame#card_dark {{
-    background: #0a0a0c;
+QFrame#card_hi {{
+    background: {BG_CARD_HI};
     border-radius: 16px;
+    border: 1px solid {BORDER};
 }}
 QFrame#card_alarm {{
-    background: {ACCENT_BG};
+    background: {ACCENT_DIM};
     border-radius: 16px;
-    border: 1px solid #fed7aa;
+    border: 1px solid {ACCENT};
 }}
-QLabel#page_title {{ font-size: 24px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
+QLabel#page_title {{ font-size: 26px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
+QLabel#page_sub   {{ font-size: 13px; color: {TEXT_DIM}; }}
 QLabel#card_title {{ font-size: 16px; font-weight: 700; color: {TEXT}; letter-spacing: -0.2px; }}
 QLabel#card_sub   {{ font-size: 12px; color: {TEXT_DIM}; }}
 QLabel#big_value  {{ font-size: 32px; font-weight: 700; color: {TEXT}; letter-spacing: -1px; }}
-QLabel#stat_label {{ font-size: 11px; color: {TEXT_DIM}; font-weight: 600; letter-spacing: 0.3px; }}
-QLabel#stat_value {{ font-size: 22px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
+QLabel#stat_label {{ font-size: 10px; color: {TEXT_DIM}; font-weight: 700; letter-spacing: 0.8px; }}
+QLabel#stat_value {{ font-size: 24px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
 QLabel#pill_active {{
-    background: {ACCENT}; color: white;
-    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 700;
+    background: {ACCENT}; color: #0a0a0c;
+    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 800;
 }}
 QLabel#pill_ok {{
-    background: #d1fae5; color: {POS};
+    background: {POS_DIM}; color: {POS};
     font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 700;
+    border: 1px solid {POS};
 }}
 QLabel#pill_off {{
-    background: #f3f4f6; color: {TEXT_DIM};
+    background: {BG_CARD_HI}; color: {TEXT_DIM};
     font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 700;
+    border: 1px solid {BORDER};
 }}
 QPushButton#cta_dark {{
-    background: #0a0a0c; color: white;
-    border-radius: 22px; padding: 10px 22px; font-weight: 700; font-size: 13px;
+    background: {BG_CARD_HI}; color: {TEXT};
+    border: 1px solid {BORDER}; border-radius: 22px;
+    padding: 10px 22px; font-weight: 700; font-size: 13px;
 }}
-QPushButton#cta_dark:hover {{ background: #2a2a2c; }}
+QPushButton#cta_dark:hover {{ background: {BORDER}; }}
 QPushButton#cta_accent {{
-    background: {ACCENT}; color: white;
-    border-radius: 22px; padding: 10px 22px; font-weight: 700; font-size: 13px;
+    background: {ACCENT}; color: #0a0a0c;
+    border-radius: 22px; padding: 10px 22px; font-weight: 800; font-size: 13px;
 }}
+QPushButton#cta_accent:hover {{ background: #ffa033; }}
 
-QFrame#alarm_row {{ background: white; border-radius: 12px; border: 1px solid #f1f2f4; }}
-QLabel.alarm_title {{ font-size: 14px; font-weight: 700; color: {NEG}; }}
+QLabel.alarm_title      {{ font-size: 14px; font-weight: 700; color: {NEG}; }}
 QLabel.alarm_title_warn {{ font-size: 14px; font-weight: 700; color: {WARN}; }}
-QLabel.alarm_meta {{ font-size: 11px; color: {TEXT_DIM}; }}
+QLabel.alarm_meta       {{ font-size: 11px; color: {TEXT_DIM}; }}
 
-/* Mobile - dark call-screen */
+/* Mobile - call-screen */
 QWidget#mobile {{ background: {BG_DARK}; }}
-QLabel.mob_caller  {{ color: white; font-size: 36px; font-weight: 600; letter-spacing: -1px; }}
-QLabel.mob_label   {{ color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500; }}
-QLabel.mob_status  {{ color: rgba(255,255,255,0.4); font-size: 13px; }}
-QLabel.mob_subtitle {{ color: rgba(255,255,255,0.9); font-size: 17px; font-weight: 500; }}
-
 QPushButton#mob_accept {{
-    background: {POS}; border-radius: 36px;
-    min-width: 72px; min-height: 72px; max-width: 72px; max-height: 72px;
-    font-size: 28px; color: white;
+    background: {POS}; border-radius: 38px;
+    min-width: 76px; min-height: 76px; max-width: 76px; max-height: 76px;
+    font-size: 30px; color: white;
 }}
 QPushButton#mob_decline {{
-    background: {NEG}; border-radius: 36px;
-    min-width: 72px; min-height: 72px; max-width: 72px; max-height: 72px;
-    font-size: 28px; color: white;
+    background: {NEG}; border-radius: 38px;
+    min-width: 76px; min-height: 76px; max-width: 76px; max-height: 76px;
+    font-size: 30px; color: white;
 }}
 QPushButton#mob_action {{
-    background: rgba(255,255,255,0.12); border-radius: 28px;
-    min-width: 56px; min-height: 56px; max-width: 56px; max-height: 56px;
-    color: white; font-size: 18px;
+    background: rgba(255,255,255,0.10); border-radius: 30px;
+    min-width: 60px; min-height: 60px; max-width: 60px; max-height: 60px;
+    color: white; font-size: 20px;
 }}
-QPushButton#mob_action:hover {{ background: rgba(255,255,255,0.18); }}
+QPushButton#mob_action:hover {{ background: rgba(255,255,255,0.16); }}
 
-QScrollArea, QListWidget {{ background: transparent; border: 0; }}
+QScrollArea, QListWidget {{ background: transparent; border: 0; color: {TEXT}; }}
+QListWidget {{ font-size: 13px; }}
+QListWidget::item {{ padding: 8px 10px; border-radius: 6px; }}
+QListWidget::item:hover {{ background: rgba(255,255,255,0.04); }}
 QScrollBar:vertical {{ background: transparent; width: 6px; }}
-QScrollBar::handle:vertical {{ background: rgba(0,0,0,0.15); border-radius: 3px; min-height: 30px; }}
+QScrollBar::handle:vertical {{ background: rgba(255,255,255,0.12); border-radius: 3px; min-height: 30px; }}
+QScrollBar::handle:vertical:hover {{ background: rgba(255,255,255,0.22); }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 """
 
@@ -152,7 +156,7 @@ class SentimentBar(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#e5e7eb"))
+        p.setBrush(QColor("#2a2a2f"))
         p.drawRoundedRect(0, 0, w, h, h / 2, h / 2)
         if w <= 0:
             return
