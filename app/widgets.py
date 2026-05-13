@@ -1,128 +1,147 @@
-"""Gedeelde Qt-widgets en stylesheet."""
+"""Flat moderne Qt-widgets en stylesheet voor VitaCall."""
 from __future__ import annotations
 
-import time
-
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QLabel, QPushButton, QVBoxLayout, QWidget
 
-STYLE = """
-* { font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif; color: #f5f5f7; }
-QWidget#shell  { background: #0a0a0c; }
-QWidget#admin  { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                  stop:0 #0d0d10, stop:1 #08080a);
-                 border-right: 1px solid rgba(255,255,255,0.06); }
-QWidget#call   { background: #0a0a0c; }
-QWidget#mobile { background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                  stop:0 #0d0d10, stop:1 #050507); }
-QLabel#brand   { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
-QLabel#caller_name { font-size: 46px; font-weight: 700; letter-spacing: -1.2px; color: #fff; }
-QLabel#caller_sub  { color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500; }
-QLabel#section_title {
-    font-size: 10px; font-weight: 800; letter-spacing: 1.4px;
-    color: rgba(255,255,255,0.4); text-transform: uppercase;
-}
-QLabel.dim   { color: rgba(255,255,255,0.35); font-style: italic; font-size: 12px; }
-QLabel.empty { color: rgba(255,255,255,0.3); font-style: italic; font-size: 12px; }
-QLabel.pos   { color: #30d158; font-weight: 700; }
-QLabel.neg   { color: #ff453a; font-weight: 700; }
-QLabel.amb   { color: #ffd60a; font-weight: 700; }
-QLabel.metric_label { font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 0.8px; font-weight: 700; }
-QFrame.metric_box {
-    background: qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                stop:0 #1a1a1c, stop:1 #141416);
-    border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
-}
-QLabel#pill_on  { background: rgba(48,209,88,0.18); color: #30d158;
-                   font-size: 10px; padding: 3px 10px; border-radius: 10px; font-weight: 800;
-                   border: 1px solid rgba(48,209,88,0.3); }
-QLabel#pill_off { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.45);
-                   font-size: 10px; padding: 3px 10px; border-radius: 10px; font-weight: 700;
-                   border: 1px solid rgba(255,255,255,0.08); }
-QFrame#row_pos {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 rgba(48,209,88,0.12), stop:1 rgba(48,209,88,0.04));
-    border-left: 3px solid #30d158; border-radius: 12px;
-}
-QFrame#row_neg {
-    background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                stop:0 rgba(255,69,58,0.13), stop:1 rgba(255,69,58,0.04));
-    border-left: 3px solid #ff453a; border-radius: 12px;
-}
-QFrame#row     { background: #1a1a1c; border-left: 3px solid rgba(255,255,255,0.2); border-radius: 12px; }
-QPushButton#accept {
-    background: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
-                stop:0 #34d870, stop:1 #1fa951);
-    border-radius: 36px; min-width: 72px; min-height: 72px;
-    max-width: 72px; max-height: 72px; font-weight: 800; font-size: 26px; color: #fff;
-    border: 1px solid rgba(255,255,255,0.15);
-}
-QPushButton#accept:hover { background: #38e078; }
-QPushButton#decline, QPushButton#endcall {
-    background: qradialgradient(cx:0.5, cy:0.5, radius:0.6, fx:0.5, fy:0.5,
-                stop:0 #ff5547, stop:1 #d92e23);
-    border-radius: 36px; min-width: 72px; min-height: 72px;
-    max-width: 72px; max-height: 72px; font-weight: 800; font-size: 26px; color: #fff;
-    border: 1px solid rgba(255,255,255,0.15);
-}
-QPushButton#decline:hover, QPushButton#endcall:hover { background: #ff6357; }
-QPushButton#mob_call {
-    background: qradialgradient(cx:0.5, cy:0.4, radius:0.7, fx:0.5, fy:0.4,
-                stop:0 #34d870, stop:1 #1fa951);
-    border-radius: 44px; min-width: 88px; min-height: 88px;
-    max-width: 88px; max-height: 88px; font-size: 30px; font-weight: 800; color: #fff;
-    border: 1px solid rgba(255,255,255,0.18);
-}
-QPushButton#mob_end {
-    background: qradialgradient(cx:0.5, cy:0.4, radius:0.7, fx:0.5, fy:0.4,
-                stop:0 #ff5547, stop:1 #d92e23);
-    border-radius: 44px; min-width: 88px; min-height: 88px;
-    max-width: 88px; max-height: 88px; font-size: 26px; font-weight: 800; color: #fff;
-    border: 1px solid rgba(255,255,255,0.18);
-}
-QLineEdit {
-    background: #18181a; padding: 10px 14px; border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.08); font-size: 13px; color: #f5f5f7;
-}
-QLineEdit:focus { border: 1px solid rgba(48,209,88,0.5); }
-QScrollArea, QListWidget { background: transparent; border: 0; }
-QListWidget::item { padding: 10px 12px; border-radius: 8px; font-size: 13px; margin: 2px 0; }
-QListWidget::item:hover { background: rgba(255,255,255,0.05); }
-QListWidget::item:selected { background: rgba(48,209,88,0.12); }
-QScrollBar:vertical { background: transparent; width: 6px; }
-QScrollBar::handle:vertical { background: rgba(255,255,255,0.15); border-radius: 3px; min-height: 30px; }
-QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.25); }
-QScrollBar::add-line, QScrollBar::sub-line { height: 0; }
+# Palet (flat, geen gradients).
+BG_LIGHT = "#f4f5f7"      # operator-achtergrond
+BG_CARD = "#ffffff"       # cards in operator
+BG_DARK = "#101012"       # mobile-achtergrond
+TEXT = "#0a0a0c"
+TEXT_DIM = "#6b6b73"
+TEXT_INV = "#f5f5f7"
+ACCENT = "#ff8a00"        # oranje, zoals foto 3
+ACCENT_BG = "#fff1de"
+POS = "#10b981"
+NEG = "#ef4444"
+WARN = "#f59e0b"
+
+STYLE = f"""
+* {{ font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', sans-serif; color: {TEXT}; }}
+
+/* Operator dashboard - light theme */
+QWidget#shell {{ background: {BG_LIGHT}; }}
+QWidget#topbar {{ background: {BG_LIGHT}; }}
+QFrame#card {{
+    background: {BG_CARD};
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+}}
+QFrame#card_dark {{
+    background: #0a0a0c;
+    border-radius: 16px;
+}}
+QFrame#card_alarm {{
+    background: {ACCENT_BG};
+    border-radius: 16px;
+    border: 1px solid #fed7aa;
+}}
+QLabel#page_title {{ font-size: 24px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
+QLabel#card_title {{ font-size: 16px; font-weight: 700; color: {TEXT}; letter-spacing: -0.2px; }}
+QLabel#card_sub   {{ font-size: 12px; color: {TEXT_DIM}; }}
+QLabel#big_value  {{ font-size: 32px; font-weight: 700; color: {TEXT}; letter-spacing: -1px; }}
+QLabel#stat_label {{ font-size: 11px; color: {TEXT_DIM}; font-weight: 600; letter-spacing: 0.3px; }}
+QLabel#stat_value {{ font-size: 22px; font-weight: 700; color: {TEXT}; letter-spacing: -0.5px; }}
+QLabel#pill_active {{
+    background: {ACCENT}; color: white;
+    font-size: 11px; padding: 4px 12px; border-radius: 12px; font-weight: 700;
+}}
+QLabel#pill_ok {{
+    background: #d1fae5; color: {POS};
+    font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 700;
+}}
+QLabel#pill_off {{
+    background: #f3f4f6; color: {TEXT_DIM};
+    font-size: 11px; padding: 4px 10px; border-radius: 10px; font-weight: 700;
+}}
+QPushButton#cta_dark {{
+    background: #0a0a0c; color: white;
+    border-radius: 22px; padding: 10px 22px; font-weight: 700; font-size: 13px;
+}}
+QPushButton#cta_dark:hover {{ background: #2a2a2c; }}
+QPushButton#cta_accent {{
+    background: {ACCENT}; color: white;
+    border-radius: 22px; padding: 10px 22px; font-weight: 700; font-size: 13px;
+}}
+
+QFrame#alarm_row {{ background: white; border-radius: 12px; border: 1px solid #f1f2f4; }}
+QLabel.alarm_title {{ font-size: 14px; font-weight: 700; color: {NEG}; }}
+QLabel.alarm_title_warn {{ font-size: 14px; font-weight: 700; color: {WARN}; }}
+QLabel.alarm_meta {{ font-size: 11px; color: {TEXT_DIM}; }}
+
+/* Mobile - dark call-screen */
+QWidget#mobile {{ background: {BG_DARK}; }}
+QLabel.mob_caller  {{ color: white; font-size: 36px; font-weight: 600; letter-spacing: -1px; }}
+QLabel.mob_label   {{ color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500; }}
+QLabel.mob_status  {{ color: rgba(255,255,255,0.4); font-size: 13px; }}
+QLabel.mob_subtitle {{ color: rgba(255,255,255,0.9); font-size: 17px; font-weight: 500; }}
+
+QPushButton#mob_accept {{
+    background: {POS}; border-radius: 36px;
+    min-width: 72px; min-height: 72px; max-width: 72px; max-height: 72px;
+    font-size: 28px; color: white;
+}}
+QPushButton#mob_decline {{
+    background: {NEG}; border-radius: 36px;
+    min-width: 72px; min-height: 72px; max-width: 72px; max-height: 72px;
+    font-size: 28px; color: white;
+}}
+QPushButton#mob_action {{
+    background: rgba(255,255,255,0.12); border-radius: 28px;
+    min-width: 56px; min-height: 56px; max-width: 56px; max-height: 56px;
+    color: white; font-size: 18px;
+}}
+QPushButton#mob_action:hover {{ background: rgba(255,255,255,0.18); }}
+
+QScrollArea, QListWidget {{ background: transparent; border: 0; }}
+QScrollBar:vertical {{ background: transparent; width: 6px; }}
+QScrollBar::handle:vertical {{ background: rgba(0,0,0,0.15); border-radius: 3px; min-height: 30px; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 """
 
 
-def make_metric_box(label_text: str, value_text: str, value_class: str = "") -> QFrame:
-    box = QFrame()
-    box.setObjectName("metric_box")
-    box.setProperty("class", "metric_box")
-    layout = QVBoxLayout(box)
-    layout.setContentsMargins(8, 6, 8, 6)
-    layout.setSpacing(2)
-    lbl = QLabel(label_text.upper())
-    lbl.setProperty("class", "metric_label")
-    val = QLabel(value_text)
-    val.setStyleSheet("font-size: 16px; font-weight: 600;")
-    if value_class:
-        val.setProperty("class", value_class)
-    layout.addWidget(lbl)
-    layout.addWidget(val)
-    box._value_label = val  # type: ignore[attr-defined]
-    return box
+class IconButton(QPushButton):
+    """Ronde knop met een unicode-symbool als icon."""
+
+    def __init__(self, symbol: str, object_name: str) -> None:
+        super().__init__(symbol)
+        self.setObjectName(object_name)
+        f = self.font()
+        f.setFamily("Segoe UI Emoji")
+        self.setFont(f)
 
 
-class StackedBar(QWidget):
-    """Dunne pos/neg ratio-bar."""
+class StatCard(QFrame):
+    """Compacte witte stat-card met label + waarde."""
+
+    def __init__(self, label: str, value: str, color: str | None = None) -> None:
+        super().__init__()
+        self.setObjectName("card")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(4)
+        lbl = QLabel(label.upper())
+        lbl.setObjectName("stat_label")
+        self.value_label = QLabel(value)
+        self.value_label.setObjectName("stat_value")
+        if color:
+            self.value_label.setStyleSheet(f"color: {color}; font-size: 22px; font-weight: 700;")
+        layout.addWidget(lbl)
+        layout.addWidget(self.value_label)
+
+    def set_value(self, text: str) -> None:
+        self.value_label.setText(text)
+
+
+class SentimentBar(QWidget):
+    """Horizontale stacked bar: groen positief vs rood negatief."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.fraction = 0.0
-        self.setFixedHeight(8)
+        self.fraction = 0.5
+        self.setFixedHeight(10)
 
     def set_pos(self, fraction: float) -> None:
         self.fraction = max(0.0, min(1.0, fraction))
@@ -133,66 +152,39 @@ class StackedBar(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#2a2a2c"))
+        p.setBrush(QColor("#e5e7eb"))
         p.drawRoundedRect(0, 0, w, h, h / 2, h / 2)
         if w <= 0:
             return
         pos_w = int(w * self.fraction)
         if pos_w > 0:
-            p.setBrush(QColor("#30d158"))
+            p.setBrush(QColor(POS))
             p.drawRoundedRect(0, 0, pos_w, h, h / 2, h / 2)
         if pos_w < w:
-            p.setBrush(QColor("#ff453a"))
+            p.setBrush(QColor(NEG))
             p.drawRoundedRect(pos_w, 0, w - pos_w, h, h / 2, h / 2)
 
 
-class HoldButton(QPushButton):
-    """Press-and-hold knop met progress-ring; vuurt na 2s vasthouden."""
+class PulseDot(QWidget):
+    """Rode pulserende dot voor 'recording'."""
 
-    held = Signal()
-
-    def __init__(self, label: str, object_name: str) -> None:
-        super().__init__(label)
-        self.setObjectName(object_name)
-        self._progress = 0.0
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._start_t = 0.0
-
-    def mousePressEvent(self, e) -> None:  # noqa: N802
-        self._start_t = time.time()
-        self._progress = 0.0
-        self._timer.start(50)
-        super().mousePressEvent(e)
-
-    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
-        self._cancel()
-        super().mouseReleaseEvent(e)
-
-    def leaveEvent(self, e) -> None:  # noqa: N802
-        self._cancel()
-        super().leaveEvent(e)
-
-    def _cancel(self) -> None:
-        self._timer.stop()
-        self._progress = 0.0
-        self.update()
+    def __init__(self) -> None:
+        super().__init__()
+        self.setFixedSize(14, 14)
+        self._phase = 0.0
+        t = QTimer(self)
+        t.timeout.connect(self._tick)
+        t.start(60)
 
     def _tick(self) -> None:
-        self._progress = min((time.time() - self._start_t) / 2.0, 1.0)
+        self._phase = (self._phase + 0.08) % 6.28
         self.update()
-        if self._progress >= 1.0:
-            self._timer.stop()
-            self.held.emit()
-            self._progress = 0.0
 
-    def paintEvent(self, ev) -> None:  # noqa: N802
-        super().paintEvent(ev)
-        if self._progress <= 0:
-            return
+    def paintEvent(self, _event) -> None:  # noqa: N802
+        import math
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        pen = QPen(QColor(255, 255, 255, 240))
-        pen.setWidth(3)
-        p.setPen(pen)
-        p.drawArc(self.rect().adjusted(2, 2, -2, -2), 90 * 16, -int(360 * 16 * self._progress))
+        p.setPen(Qt.PenStyle.NoPen)
+        alpha = int(180 + 60 * math.sin(self._phase))
+        p.setBrush(QColor(239, 68, 68, alpha))
+        p.drawEllipse(2, 2, 10, 10)

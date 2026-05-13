@@ -1,17 +1,20 @@
-"""VitaCall desktop UI — operator + beller vensters.
+"""VitaCall desktop UI: operator-dashboard + iPhone-style call-screen voor beller.
 
-    python app/ui.py              # operator (alarmcentrale) + embedded backend
-    python app/ui.py --mobile     # beller
+    python app/ui.py              # operator-dashboard + embedded backend
+    python app/ui.py --mobile     # beller-call-screen
     python app/ui.py --no-server  # operator zonder backend (extern uvicorn)
+
+Geen text-input meer: transcript komt van speech-to-text (Vosk-NL).
+Zonder Vosk wordt een demo-script afgespeeld zodat de UI altijd iets toont.
 """
 from __future__ import annotations
 
 import argparse
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
-# Maak `from app.*` ook werken als script-mode (python app/ui.py) wordt gebruikt.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
@@ -19,11 +22,10 @@ if str(_PROJECT_ROOT) not in sys.path:
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -35,7 +37,16 @@ from PySide6.QtWidgets import (
 from app.backend import start_api_server
 from app.models import EdgeModel, api_health, find_keywords, score_text
 from app.signals import AudioBridge, FileBus
-from app.widgets import HoldButton, STYLE, StackedBar, make_metric_box
+from app.widgets import (
+    ACCENT,
+    IconButton,
+    NEG,
+    POS,
+    PulseDot,
+    SentimentBar,
+    STYLE,
+    StatCard,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 LITE_MODEL_PATH = ROOT / "models" / "sentiment_lite.json"
@@ -43,554 +54,386 @@ HEAVY_MODEL_PATH = ROOT / "models" / "sentiment_heavy.pkl"
 SIGNAL_FILE = ROOT / "signaling.json"
 VOSK_DIR = ROOT / "models" / "vosk-nl"
 
+DEMO_LINES = [
+    "hallo dit is de alarmcentrale",
+    "ik heb mijn moeder net gevonden",
+    "zij ligt op de grond",
+    "ze ademt heel zwaar",
+    "ik heb pijn op de borst",
+    "ze is bewusteloos",
+    "het lijkt op een hartaanval",
+    "ze heeft bloedverdunners",
+]
 
-# ====== Operator window ======
-class OperatorWindow(QWidget):
+
+class OperatorDashboard(QWidget):
+    """Operator-dashboard met live transcript, sentiment, stats en alarmen."""
+
     def __init__(self, edge_model: EdgeModel | None) -> None:
         super().__init__()
-        self.setWindowTitle("VitaCall — alarmcentrale")
-        self.resize(1100, 720)
+        self.setWindowTitle("VitaCall, alarmcentrale dashboard")
+        self.resize(1280, 800)
         self.setObjectName("shell")
         self.edge_model = edge_model
         self.bus = FileBus("operator", SIGNAL_FILE)
-        self.bus.message.connect(self._on_message)
+        self.bus.message.connect(self._on_bus_message)
         self.audio = AudioBridge(VOSK_DIR)
         self.state = "idle"
-        self.caller_id = ""
-        self.caller_name = ""
+        self.caller_id = "anoniem"
         self.timer_seconds = 0
         self.transcript: list[dict] = []
-        self.keywords: list[dict] = []
-        self.history: list[dict] = []
+        self.urgentie_count = 0
+        self.medicatie_count = 0
+        self.pos_count = 0
+        self.neg_count = 0
+        self._demo_idx = 0
         self._build_ui()
-        QTimer(self, timeout=self._on_tick, interval=1000).start()  # type: ignore[call-arg]
-        t = QTimer(self, timeout=self._refresh_health, interval=3000)  # type: ignore[call-arg]
-        t.start()
+        QTimer(self, timeout=self._tick, interval=1000).start()  # type: ignore[call-arg]
+        QTimer(self, timeout=self._refresh_health, interval=3000).start()  # type: ignore[call-arg]
         self._refresh_health()
-
-    def _build_ui(self) -> None:
-        root = QHBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(0)
-
-        # Sidebar
-        admin = QWidget()
-        admin.setObjectName("admin")
-        admin.setFixedWidth(210)
-        a = QVBoxLayout(admin)
-        a.setContentsMargins(16, 22, 16, 22)
-        a.setSpacing(14)
-
-        a.addWidget(self._section_title("Stemming"))
-        self.bar = StackedBar()
-        a.addWidget(self.bar)
-        self.empty_mood = QLabel("Wacht op gesprek")
-        self.empty_mood.setProperty("class", "empty")
-        a.addWidget(self.empty_mood)
-
-        grid = QHBoxLayout()
-        grid.setSpacing(6)
-        self.box_pos = make_metric_box("positief", "0%", "pos")
-        self.box_neg = make_metric_box("negatief", "0%", "neg")
-        grid.addWidget(self.box_pos)
-        grid.addWidget(self.box_neg)
-        a.addLayout(grid)
-
-        grid2 = QHBoxLayout()
-        grid2.setSpacing(6)
-        self.box_frag = make_metric_box("fragmenten", "0")
-        self.box_conf = make_metric_box("zekerheid", "0%")
-        grid2.addWidget(self.box_frag)
-        grid2.addWidget(self.box_conf)
-        a.addLayout(grid2)
-
-        a.addSpacing(8)
-        a.addWidget(self._section_title("Signalen"))
-        self.kw_list = QListWidget()
-        self.kw_list.setMaximumHeight(220)
-        a.addWidget(self.kw_list)
-        self.empty_kw = QLabel("Nog geen signalen")
-        self.empty_kw.setProperty("class", "empty")
-        a.addWidget(self.empty_kw)
-
-        grid3 = QHBoxLayout()
-        grid3.setSpacing(6)
-        self.box_urg = make_metric_box("urgentie", "0")
-        self.box_med = make_metric_box("medicatie", "0")
-        grid3.addWidget(self.box_urg)
-        grid3.addWidget(self.box_med)
-        a.addLayout(grid3)
-
-        a.addSpacing(8)
-        a.addWidget(self._section_title("Handmatig fragment"))
-        self.manual = QLineEdit()
-        self.manual.setPlaceholderText("type wat de beller zegt en druk enter")
-        self.manual.returnPressed.connect(self._submit_manual)
-        a.addWidget(self.manual)
-        a.addStretch(1)
-
-        # Center
-        call = QWidget()
-        call.setObjectName("call")
-        c = QVBoxLayout(call)
-        c.setContentsMargins(40, 50, 40, 50)
-        c.setSpacing(16)
-
-        topbar = QHBoxLayout()
-        brand = QLabel("VitaCall  alarmcentrale")
-        brand.setObjectName("brand")
-        self.pill = QLabel("offline")
-        self.pill.setObjectName("pill_off")
-        topbar.addWidget(brand)
-        topbar.addStretch(1)
-        topbar.addWidget(self.pill)
-        c.addLayout(topbar)
-
-        self.caller_lbl = QLabel("Geen actieve oproep")
-        self.caller_lbl.setObjectName("caller_name")
-        self.caller_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.caller_sub = QLabel("systeem klaar, geen actieve melding")
-        self.caller_sub.setObjectName("caller_sub")
-        self.caller_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        c.addWidget(self.caller_lbl)
-        c.addWidget(self.caller_sub)
-
-        self.transcript_area = QScrollArea()
-        self.transcript_area.setWidgetResizable(True)
-        self.transcript_inner = QWidget()
-        self.transcript_layout = QVBoxLayout(self.transcript_inner)
-        self.transcript_layout.setSpacing(10)
-        self.transcript_layout.addStretch(1)
-        self.transcript_area.setWidget(self.transcript_inner)
-        c.addWidget(self.transcript_area, 1)
-
-        self.queue = QListWidget()
-        self.queue.itemClicked.connect(self._open_history_item)
-        self.queue.setMaximumHeight(180)
-        c.addWidget(self.queue)
-
-        actions = QHBoxLayout()
-        actions.setSpacing(56)
-        actions.addStretch(1)
-        self.btn_decline = QPushButton("✕")
-        self.btn_decline.setObjectName("decline")
-        self.btn_decline.clicked.connect(self._decline)
-        self.btn_accept = QPushButton("☎")
-        self.btn_accept.setObjectName("accept")
-        self.btn_accept.clicked.connect(self._accept)
-        self.btn_end = QPushButton("✕")
-        self.btn_end.setObjectName("endcall")
-        self.btn_end.clicked.connect(self._end_call)
-        self.idle_lbl = QLabel("☎  Wacht op binnenkomende oproep")
-        self.idle_lbl.setStyleSheet(
-            "background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.65);"
-            "padding: 18px 28px; border-radius: 16px; font-size: 15px;"
-        )
-        for w in (self.btn_decline, self.btn_accept, self.btn_end, self.idle_lbl):
-            actions.addWidget(w)
-        actions.addStretch(1)
-        c.addLayout(actions)
-
-        root.addWidget(admin)
-        root.addWidget(call, 1)
-        self._refresh_state()
-
-    def _section_title(self, text: str) -> QLabel:
-        lbl = QLabel(text.upper())
-        lbl.setObjectName("section_title")
-        return lbl
-
-    def _refresh_health(self) -> None:
-        up = api_health()
-        self.pill.setText("verbonden" if up else "offline")
-        self.pill.setObjectName("pill_on" if up else "pill_off")
-        self.pill.setStyleSheet("")
-
-    def _refresh_state(self) -> None:
-        live = self.state == "live"
-        incoming = self.state == "incoming"
-        idle = self.state == "idle"
-
-        if idle:
-            self.caller_lbl.setText("Geen actieve oproep")
-            last = self.history[0] if self.history else None
-            self.caller_sub.setText(f"laatste oproep {last['time']}" if last else "systeem klaar, geen actieve melding")
-        elif incoming:
-            self.caller_lbl.setText(self.caller_name or "Beller")
-            self.caller_sub.setText("inkomend")
-        else:
-            self.caller_lbl.setText(self.caller_name or "Beller")
-            mins, secs = divmod(self.timer_seconds, 60)
-            self.caller_sub.setText(f"{mins:02d}:{secs:02d}")
-
-        self.btn_accept.setVisible(incoming)
-        self.btn_decline.setVisible(incoming)
-        self.btn_end.setVisible(live)
-        self.idle_lbl.setVisible(idle)
-        self.queue.setVisible(idle)
-        self.transcript_area.setVisible(not idle or len(self.transcript) > 0)
-        self.manual.setVisible(live or incoming)
-
-        n = len(self.transcript)
-        pos = sum(1 for t in self.transcript if t.get("sentiment") == "positief")
-        pos_pct = round(pos / n * 100) if n else 0
-        avg_conf = round(sum(t.get("confidence", 0) for t in self.transcript) / n * 100) if n else 0
-        self.bar.set_pos(pos / n if n else 0.0)
-        self.box_pos._value_label.setText(f"{pos_pct}%")  # type: ignore[attr-defined]
-        self.box_neg._value_label.setText(f"{100 - pos_pct if n else 0}%")  # type: ignore[attr-defined]
-        self.box_frag._value_label.setText(str(n))  # type: ignore[attr-defined]
-        self.box_conf._value_label.setText(f"{avg_conf}%")  # type: ignore[attr-defined]
-        self.empty_mood.setVisible(n == 0)
-        self.bar.setVisible(n > 0)
-
-        urg = sum(1 for k in self.keywords if k["type"] == "urgentie")
-        med = sum(1 for k in self.keywords if k["type"] == "medicatie")
-        self.box_urg._value_label.setText(str(urg))  # type: ignore[attr-defined]
-        self.box_med._value_label.setText(str(med))  # type: ignore[attr-defined]
-        self.box_urg._value_label.setProperty("class", "neg" if urg else "")  # type: ignore[attr-defined]
-        self.box_med._value_label.setProperty("class", "amb" if med else "")  # type: ignore[attr-defined]
-        self.empty_kw.setVisible(len(self.keywords) == 0)
-        self.kw_list.setVisible(len(self.keywords) > 0)
-
-        is_urgent = any(k["type"] == "urgentie" for k in self.keywords)
-        self.setProperty("class", "urgent" if is_urgent else "")
-        self.style().unpolish(self)
-        self.style().polish(self)
-
-        self.queue.clear()
-        for h in self.history:
-            mins, secs = divmod(h["duration"], 60)
-            tag = "  [URGENT]" if h.get("urgent") else ""
-            it = QListWidgetItem(f"{h['time']}   {h['callerName']}   {mins:02d}:{secs:02d}{tag}")
-            it.setData(Qt.ItemDataRole.UserRole, h)
-            self.queue.addItem(it)
-
-    def _on_tick(self) -> None:
-        if self.state == "live":
-            self.timer_seconds += 1
-            self._refresh_state()
-
-    def _on_message(self, msg: dict) -> None:
-        t = msg.get("type")
-        if t == "invite":
-            self.caller_id = msg.get("callerId", "")
-            self.caller_name = msg.get("callerName", "Beller")
-            self.state = "incoming"
-            self._refresh_state()
-        elif t == "transcript" and msg.get("text"):
-            self._add_transcript(msg["text"])
-        elif t == "hangup":
-            self._end_call(send=False)
-
-    def _add_transcript(self, text: str) -> None:
-        result = score_text(text, self.edge_model)
-        if result is None:
-            return
-        entry = {
-            "id": time.time(),
-            "time": time.strftime("%H:%M"),
-            "text": text,
-            "sentiment": result["sentiment"],
-            "confidence": result["confidence"],
-            "keywords": result.get("keywords") or find_keywords(text),
-            "source": result.get("source", "edge"),
-        }
-        self.transcript.append(entry)
-        seen = {k["text"] for k in self.keywords}
-        for k in entry["keywords"]:
-            if k["text"] not in seen:
-                self.keywords.append(k)
-                seen.add(k["text"])
-                self.kw_list.addItem(QListWidgetItem(f"●  {k['text']}   {k['type']}"))
-        self._append_transcript_row(entry)
-        self._refresh_state()
-
-    def _append_transcript_row(self, entry: dict) -> None:
-        row = QFrame()
-        row.setObjectName("row_pos" if entry["sentiment"] == "positief" else "row_neg")
-        lay = QVBoxLayout(row)
-        lay.setContentsMargins(16, 12, 16, 12)
-        lay.setSpacing(6)
-        body = QLabel(entry["text"])
-        body.setWordWrap(True)
-        body.setStyleSheet("font-size: 15px;")
-        lay.addWidget(body)
-        kw_text = "  ".join(f"[{k['text']}]" for k in entry["keywords"])
-        meta = QLabel(f"{entry['time']}  ·  {entry['sentiment']}  ·  {kw_text}")
-        meta.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.65);")
-        lay.addWidget(meta)
-        self.transcript_layout.insertWidget(self.transcript_layout.count() - 1, row)
-        QTimer.singleShot(50, lambda: self.transcript_area.verticalScrollBar().setValue(
-            self.transcript_area.verticalScrollBar().maximum()))
-
-    def _submit_manual(self) -> None:
-        text = self.manual.text().strip()
-        if not text:
-            return
-        self.manual.clear()
-        self._add_transcript(text)
-        self.bus.send({"type": "transcript", "text": text})
-
-    def _accept(self) -> None:
-        self.bus.send({"type": "accept"})
-        self.audio.start()
-        self.state = "live"
-        self.timer_seconds = 0
-        self._refresh_state()
-
-    def _decline(self) -> None:
-        self.bus.send({"type": "decline"})
-        self.state = "idle"
-        self.caller_id = ""
-        self.caller_name = ""
-        self._refresh_state()
-
-    def _end_call(self, send: bool = True) -> None:
-        if send:
-            self.bus.send({"type": "hangup"})
-        self.audio.stop()
-        if self.transcript or self.caller_name:
-            urg = any(k["type"] == "urgentie" for k in self.keywords)
-            self.history.insert(0, {
-                "id": time.time(),
-                "time": time.strftime("%H:%M"),
-                "callerName": self.caller_name or "Beller",
-                "callerId": self.caller_id,
-                "duration": self.timer_seconds,
-                "urgent": urg,
-                "transcript": list(self.transcript),
-                "keywords": list(self.keywords),
-            })
-            self.history = self.history[:20]
-        self.state = "idle"
-        self.timer_seconds = 0
-        self.transcript.clear()
-        self.keywords.clear()
-        self.kw_list.clear()
-        for i in reversed(range(self.transcript_layout.count() - 1)):
-            item = self.transcript_layout.itemAt(i)
-            if item is None:
-                continue
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-        self.caller_id = ""
-        self.caller_name = ""
-        self._refresh_state()
-
-    def _open_history_item(self, item: QListWidgetItem) -> None:
-        h = item.data(Qt.ItemDataRole.UserRole)
-        if h:
-            HistoryDialog(h, self).exec()
-
-
-class HistoryDialog(QDialog):
-    def __init__(self, h: dict, parent=None) -> None:
-        super().__init__(parent)
-        self.setWindowTitle(f"Gesprek {h['time']} — {h['callerName']}")
-        self.resize(620, 540)
-        self.setStyleSheet(STYLE)
-        v = QVBoxLayout(self)
-        v.setContentsMargins(22, 22, 22, 22)
-        v.setSpacing(10)
-        head = QLabel(h["callerName"])
-        head.setStyleSheet("font-size: 22px; font-weight: 600;")
-        mins, secs = divmod(h["duration"], 60)
-        sub = QLabel(f"{h['time']} · {mins:02d}:{secs:02d} · {len(h['transcript'])} fragmenten")
-        sub.setStyleSheet("color: rgba(255,255,255,0.65); font-size: 13px;")
-        v.addWidget(head)
-        v.addWidget(sub)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        inner = QWidget()
-        il = QVBoxLayout(inner)
-        il.setSpacing(8)
-        for m in h["transcript"]:
-            row = QFrame()
-            row.setObjectName("row_pos" if m["sentiment"] == "positief" else "row_neg")
-            rl = QVBoxLayout(row)
-            rl.setContentsMargins(16, 12, 16, 12)
-            body = QLabel(m["text"])
-            body.setWordWrap(True)
-            body.setStyleSheet("font-size: 15px;")
-            kws = "  ".join(f"[{k['text']}]" for k in m.get("keywords", []))
-            meta = QLabel(f"{m['time']}  ·  {m['sentiment']}  ·  {kws}")
-            meta.setStyleSheet("font-size: 11px; color: rgba(255,255,255,0.65);")
-            rl.addWidget(body)
-            rl.addWidget(meta)
-            il.addWidget(row)
-        il.addStretch(1)
-        scroll.setWidget(inner)
-        v.addWidget(scroll, 1)
-        close = QPushButton("Sluiten")
-        close.clicked.connect(self.accept)
-        close.setStyleSheet("background: #2c2c2e; padding: 10px 18px; border-radius: 10px; font-weight: 600;")
-        v.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
-
-
-# ====== Beller (mobile) ======
-class MobileWindow(QWidget):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setWindowTitle("VitaCall — beller")
-        self.resize(420, 720)
-        self.setObjectName("mobile")
-        self.bus = FileBus("caller", SIGNAL_FILE)
-        self.bus.message.connect(self._on_message)
-        self.audio = AudioBridge(VOSK_DIR)
-        self.state = "idle"
-        self.timer_seconds = 0
-        self._build_ui()
-        QTimer(self, timeout=self._on_tick, interval=1000).start()  # type: ignore[call-arg]
+        self._start_audio_or_demo()
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 40, 28, 40)
+        root.setContentsMargins(28, 22, 28, 22)
+        root.setSpacing(18)
+
+        # Topbar
+        top = QHBoxLayout()
+        top.setSpacing(12)
+        title = QLabel("Alarmcentrale")
+        title.setObjectName("page_title")
+        top.addWidget(title)
+        active = QLabel("Live")
+        active.setObjectName("pill_active")
+        top.addWidget(active)
+        top.addStretch(1)
+        self.health_pill = QLabel("CLOUD")
+        self.health_pill.setObjectName("pill_ok")
+        top.addWidget(self.health_pill)
+        export_btn = QPushButton("Export")
+        export_btn.setObjectName("cta_dark")
+        top.addWidget(export_btn)
+        root.addLayout(top)
+
+        # Stats row: 4 stat-cards
+        stats = QHBoxLayout()
+        stats.setSpacing(14)
+        self.stat_calls = StatCard("Actieve gesprekken", "1", ACCENT)
+        self.stat_duration = StatCard("Gespreksduur", "00:00")
+        self.stat_urgentie = StatCard("Urgentie-keywords", "0", NEG)
+        self.stat_confidence = StatCard("Sentiment confidence", "0%")
+        stats.addWidget(self.stat_calls)
+        stats.addWidget(self.stat_duration)
+        stats.addWidget(self.stat_urgentie)
+        stats.addWidget(self.stat_confidence)
+        root.addLayout(stats)
+
+        # Main grid: live transcript (links) + alarmen + caller (rechts)
+        grid = QGridLayout()
+        grid.setSpacing(14)
+
+        # Live transcript card
+        transcript_card = QFrame()
+        transcript_card.setObjectName("card")
+        tl = QVBoxLayout(transcript_card)
+        tl.setContentsMargins(20, 18, 20, 18)
+        tl.setSpacing(10)
+        th = QHBoxLayout()
+        th.setSpacing(8)
+        self.pulse = PulseDot()
+        th.addWidget(self.pulse)
+        tt = QLabel("Live transcript")
+        tt.setObjectName("card_title")
+        th.addWidget(tt)
+        th.addStretch(1)
+        self.transcript_source = QLabel("speech-to-text")
+        self.transcript_source.setObjectName("card_sub")
+        th.addWidget(self.transcript_source)
+        tl.addLayout(th)
+        self.transcript_list = QListWidget()
+        self.transcript_list.setFrameShape(QFrame.Shape.NoFrame)
+        tl.addWidget(self.transcript_list, 1)
+
+        # Sentiment bar onder de transcript
+        sb_label = QLabel("Stemming pos/neg")
+        sb_label.setObjectName("stat_label")
+        tl.addWidget(sb_label)
+        self.sentiment_bar = SentimentBar()
+        tl.addWidget(self.sentiment_bar)
+
+        grid.addWidget(transcript_card, 0, 0, 2, 1)
+
+        # Caller-info card
+        caller_card = QFrame()
+        caller_card.setObjectName("card")
+        cl = QVBoxLayout(caller_card)
+        cl.setContentsMargins(20, 18, 20, 18)
+        cl.setSpacing(8)
+        ct = QLabel("Beller")
+        ct.setObjectName("card_title")
+        cl.addWidget(ct)
+        self.caller_label = QLabel(self.caller_id)
+        self.caller_label.setObjectName("big_value")
+        cl.addWidget(self.caller_label)
+        cs = QLabel("Inkomende oproep · regio onbekend")
+        cs.setObjectName("card_sub")
+        cl.addWidget(cs)
+        cl.addStretch(1)
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        accept = QPushButton("Accepteer")
+        accept.setObjectName("cta_accent")
+        accept.clicked.connect(lambda: self._set_state("active"))
+        decline = QPushButton("Hang op")
+        decline.setObjectName("cta_dark")
+        decline.clicked.connect(lambda: self._set_state("idle"))
+        actions.addWidget(accept)
+        actions.addWidget(decline)
+        cl.addLayout(actions)
+        grid.addWidget(caller_card, 0, 1)
+
+        # Alarmen card
+        alarm_card = QFrame()
+        alarm_card.setObjectName("card")
+        al = QVBoxLayout(alarm_card)
+        al.setContentsMargins(20, 18, 20, 18)
+        al.setSpacing(10)
+        ah = QHBoxLayout()
+        at = QLabel("Actieve alarmen")
+        at.setObjectName("card_title")
+        ah.addWidget(at)
+        ah.addStretch(1)
+        ahmeta = QLabel("urgentie & medicatie")
+        ahmeta.setObjectName("card_sub")
+        ah.addWidget(ahmeta)
+        al.addLayout(ah)
+        self.alarm_list = QListWidget()
+        self.alarm_list.setFrameShape(QFrame.Shape.NoFrame)
+        al.addWidget(self.alarm_list, 1)
+        grid.addWidget(alarm_card, 1, 1)
+
+        grid.setColumnStretch(0, 2)
+        grid.setColumnStretch(1, 1)
+        grid.setRowStretch(0, 1)
+        grid.setRowStretch(1, 1)
+        root.addLayout(grid, 1)
+
+    def _set_state(self, state: str) -> None:
+        self.state = state
+        if state == "idle":
+            self.timer_seconds = 0
+            self.transcript.clear()
+            self.transcript_list.clear()
+            self.alarm_list.clear()
+            self.urgentie_count = 0
+            self.pos_count = 0
+            self.neg_count = 0
+
+    def _tick(self) -> None:
+        if self.state == "active":
+            self.timer_seconds += 1
+            m, s = divmod(self.timer_seconds, 60)
+            self.stat_duration.set_value(f"{m:02}:{s:02}")
+        self._refresh_stats()
+        self._maybe_advance_demo()
+
+    def _refresh_health(self) -> None:
+        ok = api_health()
+        self.health_pill.setText("CLOUD" if ok else "EDGE")
+        self.health_pill.setObjectName("pill_ok" if ok else "pill_off")
+        self.health_pill.style().unpolish(self.health_pill)
+        self.health_pill.style().polish(self.health_pill)
+
+    def _refresh_stats(self) -> None:
+        self.stat_calls.set_value("1" if self.state == "active" else "0")
+        self.stat_urgentie.set_value(str(self.urgentie_count))
+        total = self.pos_count + self.neg_count
+        if total > 0:
+            confs = [t.get("confidence", 0) for t in self.transcript if t.get("confidence")]
+            avg = (sum(confs) / len(confs)) if confs else 0
+            self.stat_confidence.set_value(f"{int(avg * 100)}%")
+            self.sentiment_bar.set_pos(self.pos_count / total)
+        else:
+            self.stat_confidence.set_value("0%")
+
+    def _on_bus_message(self, msg: dict) -> None:
+        if msg.get("event") == "call_request":
+            self.caller_id = msg.get("caller", "anoniem")
+            self.caller_label.setText(self.caller_id)
+            self._set_state("active")
+            self._demo_idx = 0
+
+    # Audio of demo
+    def _start_audio_or_demo(self) -> None:
+        if VOSK_DIR.exists():
+            self.audio.transcript.connect(self._on_audio_chunk)
+            self.audio.start()
+            self.transcript_source.setText("Vosk live")
+        else:
+            self.transcript_source.setText("demo (geen Vosk-NL)")
+
+    def _on_audio_chunk(self, text: str) -> None:
+        self._process_utterance(text)
+
+    def _maybe_advance_demo(self) -> None:
+        if VOSK_DIR.exists() or self.state != "active":
+            return
+        if self.timer_seconds and self.timer_seconds % 3 == 0:
+            if self._demo_idx < len(DEMO_LINES):
+                self._process_utterance(DEMO_LINES[self._demo_idx])
+                self._demo_idx += 1
+
+    def _process_utterance(self, text: str) -> None:
+        result = score_text(text, self.edge_model) or {}
+        sentiment = result.get("sentiment", "?")
+        confidence = result.get("confidence", 0.0)
+        kws = result.get("keywords") or find_keywords(text)
+        row = {"text": text, "sentiment": sentiment, "confidence": confidence, "keywords": kws,
+               "time": datetime.now().strftime("%H:%M:%S")}
+        self.transcript.append(row)
+        if sentiment == "positief":
+            self.pos_count += 1
+        elif sentiment == "negatief":
+            self.neg_count += 1
+
+        # transcript-row
+        emoji = "🟢" if sentiment == "positief" else ("🔴" if sentiment == "negatief" else "⚪")
+        kw_str = " · ".join(k["text"] for k in kws[:3])
+        line = f"{row['time']}   {emoji}  {text}"
+        if kw_str:
+            line += f"    [{kw_str}]"
+        item = QListWidgetItem(line)
+        if sentiment == "negatief":
+            item.setForeground(Qt.GlobalColor.darkRed)
+        self.transcript_list.addItem(item)
+        self.transcript_list.scrollToBottom()
+
+        # alarms
+        for kw in kws:
+            if kw["type"] == "urgentie":
+                self.urgentie_count += 1
+                a = QListWidgetItem(f"⚠  {kw['text'].upper()}    {row['time']}")
+                a.setForeground(Qt.GlobalColor.red)
+                self.alarm_list.addItem(a)
+            elif kw["type"] == "medicatie":
+                a = QListWidgetItem(f"💊  {kw['text']}    {row['time']}")
+                self.alarm_list.addItem(a)
+        self.alarm_list.scrollToBottom()
+
+
+# iPhone-style call screen voor de beller
+class MobileCallScreen(QWidget):
+    """iPhone-style inkomende-oproep scherm met decline/accept onderaan."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWindowTitle("VitaCall, beller")
+        self.resize(390, 780)
+        self.setObjectName("mobile")
+        self.bus = FileBus("mobile", SIGNAL_FILE)
+        self.state = "idle"
+        self.timer_seconds = 0
+        self._build_ui()
+        QTimer(self, timeout=self._tick, interval=1000).start()  # type: ignore[call-arg]
+
+    def _build_ui(self) -> None:
+        root = QVBoxLayout(self)
+        root.setContentsMargins(28, 60, 28, 50)
         root.setSpacing(0)
 
-        top_lbl = QLabel("VitaCall")
-        top_lbl.setObjectName("brand")
-        sub_lbl = QLabel("alarmcentrale")
-        sub_lbl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px;")
-        root.addWidget(top_lbl)
-        root.addWidget(sub_lbl)
-        root.addSpacing(32)
+        top_label = QLabel("Inkomende oproep")
+        top_label.setProperty("class", "mob_label")
+        top_label.setStyleSheet("color: rgba(255,255,255,0.55); font-size: 16px; font-weight: 500;")
+        top_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(top_label)
 
-        self.title = QLabel("Hulp nodig?")
-        self.title.setStyleSheet("font-size: 48px; font-weight: 700; letter-spacing: -1px;")
-        root.addWidget(self.title)
+        root.addSpacing(14)
 
-        self.sub = QLabel("alarmcentrale")
-        self.sub.setStyleSheet("font-size: 16px; color: #ff9f0a; font-weight: 600;")
-        root.addWidget(self.sub)
-        root.addSpacing(12)
+        self.caller_label = QLabel("VitaCall 112")
+        self.caller_label.setStyleSheet("color: white; font-size: 38px; font-weight: 600; letter-spacing: -1px;")
+        self.caller_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.caller_label)
 
-        self.info = QLabel("Verbonden met centrale\nGemiddelde wachttijd: 12 seconden")
-        self.info.setStyleSheet("font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.5;")
-        root.addWidget(self.info)
-
-        self.error = QLabel("")
-        self.error.setStyleSheet(
-            "background: rgba(255,59,48,0.15); color: #ff7065;"
-            "padding: 8px 12px; border-radius: 8px; font-size: 13px;"
-        )
-        self.error.hide()
-        root.addWidget(self.error)
+        self.status_label = QLabel("alarmcentrale")
+        self.status_label.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 16px;")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.status_label)
 
         root.addStretch(1)
 
-        self.text_input = QLineEdit()
-        self.text_input.setPlaceholderText("typ wat je zegt en druk enter")
-        self.text_input.returnPressed.connect(self._send_text)
-        self.text_input.hide()
-        root.addWidget(self.text_input)
-        root.addSpacing(16)
+        # Onderste actie-rij
+        self.subtitle = QLabel("Klik groen om te bellen")
+        self.subtitle.setStyleSheet("color: rgba(255,255,255,0.85); font-size: 17px;")
+        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(self.subtitle)
 
-        self.hint = QLabel("Houd 2 seconden vast")
-        self.hint.setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.4);")
-        self.call_btn = HoldButton("☎", "mob_call")
-        self.call_btn.held.connect(self._call)
-        self.end_btn = HoldButton("✕", "mob_end")
-        self.end_btn.held.connect(self._hangup)
-        self.end_btn.hide()
+        root.addSpacing(20)
 
-        bottom = QHBoxLayout()
-        bottom.setSpacing(12)
-        bottom.addWidget(self.hint)
-        bottom.addStretch(1)
-        bottom.addWidget(self.call_btn)
-        bottom.addWidget(self.end_btn)
-        root.addLayout(bottom)
+        btns = QHBoxLayout()
+        btns.setSpacing(60)
+        btns.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.decline_btn = QPushButton("✕")
+        self.decline_btn.setObjectName("mob_decline")
+        self.decline_btn.clicked.connect(self._on_decline)
+        self.accept_btn = QPushButton("📞")
+        self.accept_btn.setObjectName("mob_accept")
+        self.accept_btn.clicked.connect(self._on_accept)
+        btns.addWidget(self.decline_btn)
+        btns.addWidget(self.accept_btn)
+        root.addLayout(btns)
 
-    def _on_tick(self) -> None:
-        if self.state == "live":
-            self.timer_seconds += 1
-            mins, secs = divmod(self.timer_seconds, 60)
-            self.sub.setText(f"{mins:02d}:{secs:02d}")
+        labels = QHBoxLayout()
+        labels.setSpacing(60)
+        labels.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dl = QLabel("Decline")
+        dl.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px;")
+        dl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        al = QLabel("Accept")
+        al.setStyleSheet("color: rgba(255,255,255,0.45); font-size: 12px;")
+        al.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        labels.addWidget(dl)
+        labels.addWidget(al)
+        root.addLayout(labels)
 
-    def _refresh_state(self) -> None:
-        if self.state == "idle":
-            self.title.setText("Hulp nodig?")
-            self.sub.setText("alarmcentrale")
-            self.info.show()
-            self.call_btn.show()
-            self.end_btn.hide()
-            self.text_input.hide()
-        elif self.state in ("calling", "ringing"):
-            self.title.setText("Verbinden")
-            self.sub.setText("verbinden…" if self.state == "calling" else "overgaan…")
-            self.info.hide()
-            self.call_btn.hide()
-            self.end_btn.show()
-            self.text_input.hide()
-        else:
-            self.title.setText("In gesprek")
-            self.info.hide()
-            self.call_btn.hide()
-            self.end_btn.show()
-            self.text_input.show()
+    def _on_accept(self) -> None:
+        self.state = "active"
+        self.timer_seconds = 0
+        self.bus.send({"event": "call_request", "caller": "Beller VitaCall"})
+        self.caller_label.setText("VitaCall 112")
+        self.subtitle.setText("In gesprek")
 
-    def _call(self) -> None:
-        self.error.hide()
-        self.state = "calling"
-        self._refresh_state()
-        caller_id = f"#{int(time.time()) % 9000 + 1000}"
-        self.bus.send({"type": "invite", "callerId": caller_id, "callerName": "Beller"})
-
-    def _send_text(self) -> None:
-        text = self.text_input.text().strip()
-        if not text:
-            return
-        self.text_input.clear()
-        self.bus.send({"type": "transcript", "text": text})
-
-    def _on_message(self, msg: dict) -> None:
-        t = msg.get("type")
-        if t == "accept":
-            self.state = "live"
-            self.timer_seconds = 0
-            self.audio.start()
-            self._refresh_state()
-        elif t == "decline":
-            self.error.setText("afgewezen")
-            self.error.show()
-            self._hangup()
-        elif t == "hangup":
-            self._hangup()
-
-    def _hangup(self) -> None:
-        if self.state in ("live", "calling", "ringing"):
-            self.bus.send({"type": "hangup"})
-        self.audio.stop()
+    def _on_decline(self) -> None:
         self.state = "idle"
         self.timer_seconds = 0
-        self._refresh_state()
+        self.subtitle.setText("Opgehangen")
+
+    def _tick(self) -> None:
+        if self.state == "active":
+            self.timer_seconds += 1
+            m, s = divmod(self.timer_seconds, 60)
+            self.status_label.setText(f"{m:02}:{s:02}")
 
 
 def main() -> None:
-    p = argparse.ArgumentParser()
-    p.add_argument("--mobile", action="store_true", help="open caller-view i.p.v. operator")
-    p.add_argument("--reset", action="store_true", help="wis signaling-bestand voor schone start")
-    p.add_argument("--no-server", action="store_true", help="start backend niet (extern uvicorn)")
-    args = p.parse_args()
-
-    if args.reset and SIGNAL_FILE.exists():
-        SIGNAL_FILE.unlink()
-
-    if not args.mobile and not args.no_server:
-        start_api_server(HEAVY_MODEL_PATH, "http://127.0.0.1:8000")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mobile", action="store_true", help="open beller-call-screen")
+    parser.add_argument("--no-server", action="store_true", help="start geen embedded backend")
+    args = parser.parse_args()
 
     app = QApplication(sys.argv)
     app.setStyleSheet(STYLE)
 
     if args.mobile:
-        w: QWidget = MobileWindow()
+        win: QWidget = MobileCallScreen()
     else:
+        if not args.no_server:
+            start_api_server(HEAVY_MODEL_PATH, "http://127.0.0.1:8000")
+            time.sleep(1)
         edge = EdgeModel.load(LITE_MODEL_PATH)
-        if edge is None:
-            print(f"[warn] edge-model niet gevonden op {LITE_MODEL_PATH}")
-        w = OperatorWindow(edge)
-    w.show()
+        win = OperatorDashboard(edge)
+
+    win.show()
     sys.exit(app.exec())
 
 
