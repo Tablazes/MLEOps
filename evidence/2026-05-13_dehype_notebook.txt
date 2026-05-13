@@ -1,0 +1,10 @@
+Notebook dehype + sync with PySide6 migration:
+- 23 cells updated
+- removed all 10 stale Electron references (markdown + code)
+- ELECTRON_SRC constant -> EDGE_DIR ('models')
+- cell 45 launch hint: npm/electron -> python app/ui.py
+- cell 49 file-presence check: electron/* -> app/ui.py, app/backend.py, app/models.py, serve.py
+- killed hype words: geavanceerd -> uitgebreid; cruciaal -> belangrijk; naadloos -> zonder gedoe
+- em-dash -> komma in NL prose
+- intro paragraph rewritten in 1e persoon
+- json integrity: 65 cells, valid JSON
