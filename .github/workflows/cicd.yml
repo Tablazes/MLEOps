@@ -1,10 +1,13 @@
-name: CI
+name: CI + CD + CT
 
 on:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  schedule:
+    - cron: "0 3 * * 0"  # CT: elke zondag 03:00 UTC
+  workflow_dispatch:
 
 jobs:
   test:
@@ -49,6 +52,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     needs: test
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -78,3 +82,33 @@ jobs:
             curl -fsS http://localhost:8000/health && break
           done
           docker stop vc
+
+  retrain:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install scikit-learn==1.5.2 pandas==2.2.3 numpy==1.26.4 \
+                      pyarrow==17.0.0 requests==2.32.3 nbconvert==7.16.6 \
+                      jupyter==1.1.1 ipykernel==6.29.5
+      - name: Voer notebook end-to-end uit (retrain)
+        run: |
+          jupyter nbconvert --to notebook --execute main.ipynb \
+                  --output main_ct_run.ipynb \
+                  --ExecutePreprocessor.timeout=1800
+      - name: Upload modellen + notebook als artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitacall-${{ github.run_number }}
+          path: |
+            models/sentiment_heavy.pkl
+            models/sentiment_lite.pkl
+            models/sentiment_lite.json
+            main_ct_run.ipynb
+          retention-days: 30
