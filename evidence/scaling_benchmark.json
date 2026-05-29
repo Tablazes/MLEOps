@@ -4,23 +4,23 @@
     {
       "batch_size": 1000,
       "rows": 22252,
-      "elapsed_s": 2.93,
-      "throughput_rps": 7598,
-      "rss_delta_mb": -49.3
+      "elapsed_s": 2.08,
+      "throughput_rps": 10712,
+      "rss_delta_mb": -61.4
     },
     {
       "batch_size": 5000,
       "rows": 22252,
-      "elapsed_s": 2.81,
-      "throughput_rps": 7920,
-      "rss_delta_mb": 65.6
+      "elapsed_s": 2.56,
+      "throughput_rps": 8680,
+      "rss_delta_mb": 61.1
     },
     {
       "batch_size": 20000,
       "rows": 22252,
-      "elapsed_s": 2.97,
-      "throughput_rps": 7500,
-      "rss_delta_mb": -2.6
+      "elapsed_s": 2.38,
+      "throughput_rps": 9332,
+      "rss_delta_mb": -5.5
     }
   ]
 }
