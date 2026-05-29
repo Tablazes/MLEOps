@@ -183,7 +183,7 @@ function applyState(st) {
             els.partial.textContent = '';
         } else {
             els.phase.textContent = 'alarmcentrale';
-            els.status.textContent = 'VitaCall';
+            els.status.textContent = 'Beller';
             els.sub.textContent = '';
             els.transcriptCard.classList.add('is-hidden');
             els.transcript.innerHTML = '';
