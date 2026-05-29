@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 log = logging.getLogger("vitacall")
@@ -162,3 +163,45 @@ def drift_endpoint():
 @app.get("/metrics")
 def metrics_endpoint():
     return metrics.snapshot()
+
+
+def to_prometheus_exposition(m: dict, d: dict) -> str:
+    """Zet metrics+drift om naar Prometheus exposition-format (text/plain).
+
+    Eén regel per metric met HELP/TYPE, zodat een Prometheus-server dit kan
+    scrapen op /metrics-prom (zie monitoring/prometheus.yml).
+    """
+    lines = []
+    fields = {
+        "vitacall_requests_total": m["requests_total"],
+        "vitacall_requests_errors": m["requests_errors"],
+        "vitacall_error_rate": m["error_rate"],
+        "vitacall_latency_p50_ms": m["p50_ms"],
+        "vitacall_latency_p95_ms": m["p95_ms"],
+        "vitacall_avg_confidence": m["avg_confidence"],
+        "vitacall_drift_score": d["drift_score"],
+        "vitacall_positive_rate": d["positive_rate"],
+    }
+    for name, value in fields.items():
+        lines.append(f"# TYPE {name} gauge")
+        lines.append(f"{name} {value}")
+    return "\n".join(lines) + "\n"
+
+
+@app.get("/metrics-prom")
+def metrics_prom():
+    """Prometheus scrape-endpoint (text/plain exposition-format)."""
+    return PlainTextResponse(to_prometheus_exposition(metrics.snapshot(), drift.snapshot()))
+
+
+# Serveer de web-frontend (web/) vanuit dezelfde service, NA de API-routes zodat
+# die blijven winnen. Alleen mounten als de map bestaat.
+try:
+    from pathlib import Path as _Path
+    from fastapi.staticfiles import StaticFiles
+    _web = _Path(__file__).resolve().parent / "web"
+    if _web.is_dir():
+        app.mount("/", StaticFiles(directory=str(_web), html=True), name="web")
+        log.info("web-frontend gemount op / vanuit %s", _web)
+except Exception as exc:  # pragma: no cover
+    log.warning("kon web-frontend niet mounten: %s", exc)
