@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VitaCall, Operator</title>
+    <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+    <div class="desk">
+        <div class="window">
+            <span id="phase-badge" class="badge badge--idle is-hidden">WACHT</span>
+            <span id="offline" class="offline is-online is-hidden" title="Verbindingsstatus">
+                <span class="offline__dot"></span>
+                <span id="offline-text" class="is-hidden">Verbonden</span>
+            </span>
+
+            <div class="window__body">
+                <div class="cols">
+                    <!-- CARD LINKS: live transcriptie + bel-acties eronder -->
+                    <section class="card col-card">
+                        <div class="card__head">
+                            <h2 class="card__title">Live transcriptie</h2>
+                            <span id="live-pulse" class="pulse is-hidden">
+                                <span class="pulse__dot"></span>
+                                <span>Live</span>
+                            </span>
+                            <span id="stt-note" class="text-dim is-hidden" style="font-size:12px;"></span>
+                        </div>
+                        <div class="card__body card__body--fill">
+                            <div id="transcript" class="transcript" aria-live="polite"></div>
+                        </div>
+
+                        <!-- Bel-acties onder de transcriptie -->
+                        <div id="callpanel" class="callpanel callpanel--idle">
+                            <div id="callpanel-name" class="callpanel__name">Geen actieve oproep</div>
+                            <div id="callpanel-sub" class="callpanel__sub">Wacht op binnenkomende oproep</div>
+                            <div class="callpanel__actions">
+                                <div class="iconbtn-group">
+                                    <div class="iconbtn-cell">
+                                        <button id="btn-accept" class="iconbtn iconbtn--accept iconbtn--lg" type="button" aria-label="Oproep accepteren" disabled>&#10003;</button>
+                                        <span class="iconbtn__label">Opnemen</span>
+                                    </div>
+                                    <div class="iconbtn-cell">
+                                        <button id="btn-end" class="iconbtn iconbtn--end iconbtn--lg" type="button" aria-label="Oproep beëindigen" disabled>&#10005;</button>
+                                        <span class="iconbtn__label">Ophangen</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- callpanel-phase blijft bestaan voor JS, verborgen -->
+                            <span id="callpanel-phase" class="is-hidden"></span>
+                        </div>
+                    </section>
+
+                    <!-- CARD RECHTS: opname & analyse -->
+                    <section class="card col-card">
+                        <div class="card__body col-card__scroll">
+                            <span id="stat-status" class="is-hidden"></span>
+
+                            <!-- Idle: geen placeholders, alleen een korte status -->
+                            <div id="analyse-empty" class="analyse-empty">Geen actief gesprek.</div>
+
+                            <!-- Analyse verschijnt pas zodra er een gesprek loopt -->
+                            <div id="analyse-content" class="is-hidden">
+                                <!-- Geïntegreerde samenvattingsbalk: duur, urgentie,
+                                     betrouwbaarheid en sentiment in één geheel. -->
+                                <div class="summary">
+                                    <div class="summary__row">
+                                        <span class="summary__item">
+                                            <span class="summary__label">Duur</span>
+                                            <span id="stat-duration" class="summary__value stat__value--mono">00:00</span>
+                                        </span>
+                                        <span class="summary__item">
+                                            <span class="summary__label">Urgentie</span>
+                                            <span id="stat-urgentie" class="summary__value summary__value--urgent">0</span>
+                                        </span>
+                                        <span class="summary__item">
+                                            <span class="summary__label">Betrouwbaarheid</span>
+                                            <span id="stat-confidence" class="summary__value stat__value--mono">0%</span>
+                                        </span>
+                                        <span class="summary__item summary__item--sentiment">
+                                            <span class="summary__label">Sentiment</span>
+                                            <span id="sentiment-pct" class="summary__value">0%</span>
+                                        </span>
+                                    </div>
+                                    <div class="sentiment" role="img" aria-label="Sentimentverhouding positief versus negatief">
+                                        <div id="sentiment-pos" class="sentiment__pos" style="width:50%"></div>
+                                    </div>
+                                </div>
+                                <span id="sentiment-pos-label" class="is-hidden"></span>
+                                <span id="sentiment-neg-label" class="is-hidden"></span>
+
+                                <!-- Hoofdmoot: kritieke triggers, klikbaar naar de regel links -->
+                                <div class="panel-block panel-block--grow">
+                                    <div class="panel-block__title">Belangrijke woorden &amp; alarmen</div>
+                                    <div id="alarms" class="alarms"></div>
+                                </div>
+                            </div><!-- /analyse-content -->
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Footer: technische systeemdata, klein en subtiel -->
+            <div class="winfoot">
+                <span class="winfoot__item">p50 <span id="metric-p50" class="winfoot__val">0</span> ms</span>
+                <span class="winfoot__sep">·</span>
+                <span class="winfoot__item">foutratio <span id="metric-error" class="winfoot__val">0%</span></span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/operator.js"></script>
+</body>
+</html>

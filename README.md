@@ -1,6 +1,11 @@
 # VitaCall
 
-Nederlandse alarmcentrale-assistent. Beller belt naar operator-dashboard. Sentiment-classifier + spoed-keywords + drift-detectie draaien live op de transcript.
+Nederlandse alarmcentrale-assistent. Beller belt naar operator-dashboard. Twee onafhankelijke modellen:
+
+- **Edge (lokaal op de operator-pc): Vosk-NL ASR** zet audio om naar tekst. De ruwe audio verlaat het apparaat nooit — dit is de privacy-oplossing en dit is het edge-model.
+- **Cloud: TF-IDF + Logistic Regression** sentiment/urgentie-classifier draait op de ge-de-identificeerde tekst (geen audio). Een los model met een eigen taak, data en evaluatie.
+
+Spoed-keywords + drift-detectie draaien live op de transcript.
 
 ## Starten
 
@@ -30,18 +35,33 @@ main.ipynb              pipeline + training + monitoring (alle code)
 serve.py                FastAPI productie-service
 app/ui.py               operator-dashboard + beller-scherm
 app/backend.py          embedded API (health, analyze, drift, metrics, call/*)
-app/models.py           edge scoring + cloud fallback
-app/signals.py          mic-loopback
+app/asr.py              edge ASR: Vosk-NL file-decoder + WER-harness (notebook-eval)
+app/signals.py          live mic -> Vosk-NL transcript (AudioBridge)
+app/models.py           cloud sentiment scoring + compacte tekst-fallback
 app/icons.py            vector-iconen (geen emoji)
 app/widgets.py          stijl + custom widgets
 start.py                launcher: opent beide vensters
 Dockerfile + docker-compose.yml
 .github/workflows/cicd.yml
 evidence/               plots + rapporten (gegenereerd door notebook)
+models/vosk-nl/         edge ASR-model (Vosk-NL, ~65.6 MB)
 models/sentiment_heavy.pkl
 ```
 
 ## Cijfers (gemeten)
+
+**Edge — Vosk-NL ASR** (audio -> tekst, lokaal):
+
+| Metric | Werkelijk |
+|---|---|
+| Modelgrootte op schijf | 65.6 MB |
+| Laadtijd | ~0.4 s |
+| RTF (decode-tijd / audio-duur) op CPU | ~0.17 (≈6x sneller dan realtime) |
+| WER | gemeten via `app/asr.evaluate()` op zelf-opgenomen referentiezinnen; zonder referentie-audio status `geen_referentie_audio` |
+
+Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door via de app-microfoon een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
+
+**Cloud — sentiment/urgentie-classifier** (tekst -> label):
 
 | Metric | Doel | Werkelijk |
 |---|---|---|

@@ -22,3 +22,6 @@ artifacts/
 .pytest_cache/
 mlruns/
 main_executed.ipynb
+
+# Vosk-NL ASR model (66MB, te groot voor git)
+models/vosk-nl/

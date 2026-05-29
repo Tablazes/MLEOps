@@ -1,10 +1,11 @@
-"""Embedded FastAPI backend — gestart als daemon-thread door ui.py."""
+"""Embedded FastAPI backend, gestart als daemon-thread door ui.py."""
 from __future__ import annotations
 
 import logging
 import pickle
 import threading
 import time
+import warnings
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -99,8 +100,12 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
         log.warning("fastapi/uvicorn niet beschikbaar, backend niet gestart")
         return
 
-    with open(heavy_model_path, "rb") as fh:
-        _model = pickle.load(fh)
+    # Model is getraind onder een oudere sklearn; de versie-mismatch is
+    # onschadelijk (zelfde pickle-protocol) maar spamt stderr. Onderdrukken.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        with open(heavy_model_path, "rb") as fh:
+            _model = pickle.load(fh)
 
     _metrics = _Metrics()
     _drift = _Drift()
@@ -204,6 +209,20 @@ def start_api_server(heavy_model_path: Path, api_url: str) -> None:
     @api.get("/metrics")
     def metrics_ep():  # noqa: ANN201
         return _metrics.snapshot()
+
+    # Serveer de web-frontend vanuit dezelfde app. Mount NA de API-routes zodat
+    # die blijven winnen; mount op "/" alleen als project-root/web bestaat.
+    try:
+        from fastapi.staticfiles import StaticFiles
+
+        _web_dir = Path(__file__).resolve().parent.parent / "web"
+        if _web_dir.is_dir():
+            api.mount("/", StaticFiles(directory=str(_web_dir), html=True), name="web")
+            log.warning("web-frontend gemount op / vanuit %s", _web_dir)
+        else:
+            log.warning("web-dir niet gevonden (%s), frontend niet gemount", _web_dir)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("kon web-frontend niet mounten: %s", exc)
 
     threading.Thread(target=lambda: uvicorn.run(api, host="0.0.0.0", port=8000, log_level="warning"),
                      daemon=True).start()

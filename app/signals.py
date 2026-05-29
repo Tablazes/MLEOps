@@ -74,60 +74,70 @@ class AudioBridge(QObject):
         self._stop = threading.Event()
 
     def start(self) -> bool:
+        """Start mic-capture + Vosk STT. Geen loopback (zou echo geven).
+
+        Returns True alleen als de STT-thread daadwerkelijk start, zodat de UI
+        'Vosk-NL live' vs 'geen mic' correct toont.
+        """
         try:
-            import numpy as np  # noqa: F401
+            import sounddevice as sd  # noqa: F401  # type: ignore[import-not-found]
+        except ImportError:
+            return False
+        return self._start_stt()
+
+    def _start_stt(self) -> bool:
+        try:
+            from vosk import KaldiRecognizer, Model, SetLogLevel  # type: ignore
             import sounddevice as sd  # type: ignore[import-not-found]
         except ImportError:
             return False
-        try:
-            self._stream = sd.Stream(
-                samplerate=16000, channels=1, dtype="int16",
-                callback=lambda indata, outdata, frames, t, s: outdata.__setitem__(slice(None), indata),
-            )
-            self._stream.start()
-        except Exception:
-            self._stream = None
-            return False
-        self._start_stt()
-        return True
-
-    def _start_stt(self) -> None:
-        try:
-            from vosk import KaldiRecognizer, Model  # type: ignore
-        except ImportError:
-            return
         if not self._vosk_dir.exists():
-            return
+            return False
+
+        # Model laden + mic openen synchroon, zodat de return eerlijk is.
+        # Eenmalig (operator accepteert call): korte hapering acceptabel.
+        try:
+            SetLogLevel(-1)  # onderdruk Kaldi-ruis op stderr
+            model = Model(str(self._vosk_dir))
+            rec = KaldiRecognizer(model, 16000)
+            # Kleinere blocksize = sneller partial-update (~150ms).
+            stream = sd.RawInputStream(samplerate=16000, blocksize=2400,
+                                       dtype="int16", channels=1)
+            stream.start()
+        except Exception:
+            return False
+        self._stream = stream
 
         def _run() -> None:
+            import json as _json
             try:
-                import json as _json
-                import sounddevice as sd  # type: ignore[import-not-found]
-                model = Model(str(self._vosk_dir))
-                rec = KaldiRecognizer(model, 16000)
-                # Kleinere blocksize = sneller partial-update (~150ms i.p.v. 250ms).
-                with sd.RawInputStream(samplerate=16000, blocksize=2400, dtype="int16", channels=1) as inp:
-                    last_partial = ""
-                    while not self._stop.is_set():
-                        data, _ = inp.read(2400)
-                        if rec.AcceptWaveform(bytes(data)):
-                            text = _json.loads(rec.Result()).get("text", "").strip()
-                            last_partial = ""
-                            if text:
-                                self.transcript.emit(text)
-                        else:
-                            partial = _json.loads(rec.PartialResult()).get("partial", "").strip()
-                            if partial and partial != last_partial:
-                                last_partial = partial
-                                self.partial.emit(partial)
+                last_partial = ""
+                while not self._stop.is_set():
+                    data, _ = stream.read(2400)
+                    if rec.AcceptWaveform(bytes(data)):
+                        text = _json.loads(rec.Result()).get("text", "").strip()
+                        last_partial = ""
+                        if text:
+                            self.transcript.emit(text)
+                    else:
+                        partial = _json.loads(rec.PartialResult()).get("partial", "").strip()
+                        if partial and partial != last_partial:
+                            last_partial = partial
+                            self.partial.emit(partial)
             except Exception:
                 return
 
         self._stt_thread = threading.Thread(target=_run, daemon=True)
         self._stt_thread.start()
+        return True
 
     def stop(self) -> None:
         self._stop.set()
+        # Laat de lees-thread eerst stoppen, anders sluiten we de stream
+        # terwijl read() er nog op wacht (PortAudio-fout / race).
+        if self._stt_thread is not None:
+            self._stt_thread.join(timeout=1.0)
+            self._stt_thread = None
         if self._stream is not None:
             try:
                 self._stream.stop()
