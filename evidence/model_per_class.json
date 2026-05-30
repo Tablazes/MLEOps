@@ -1,0 +1,12 @@
+{
+  "negatief": {
+    "precision": 0.899,
+    "recall": 0.868,
+    "f1": 0.883
+  },
+  "positief": {
+    "precision": 0.872,
+    "recall": 0.903,
+    "f1": 0.887
+  }
+}

@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-30T12:40:47",
-  "git_sha": "3a2dc71",
+  "generated_at": "2026-05-30T13:42:42",
+  "git_sha": "b0e9236",
   "layers": [
     {
       "layer": "ruw",
@@ -8,7 +8,21 @@
       "rows": 22252,
       "cols": 4,
       "errors": [],
-      "warnings": []
+      "warnings": [],
+      "stats": {
+        "rows": 22252,
+        "label_dist": {
+          "1": 11126,
+          "0": 11126
+        },
+        "balance_ratio": 1.0,
+        "token_count": {
+          "min": 1,
+          "median": 175,
+          "mean": 244.8,
+          "max": 3530
+        }
+      }
     },
     {
       "layer": "schoon",
@@ -16,7 +30,21 @@
       "rows": 22249,
       "cols": 6,
       "errors": [],
-      "warnings": []
+      "warnings": [],
+      "stats": {
+        "rows": 22249,
+        "label_dist": {
+          "1": 11125,
+          "0": 11124
+        },
+        "balance_ratio": 1.0,
+        "token_count": {
+          "min": 1,
+          "median": 175,
+          "mean": 244.8,
+          "max": 3530
+        }
+      }
     },
     {
       "layer": "trainklaar",
@@ -24,7 +52,21 @@
       "rows": 22249,
       "cols": 7,
       "errors": [],
-      "warnings": []
+      "warnings": [],
+      "stats": {
+        "rows": 22249,
+        "label_dist": {
+          "1": 11125,
+          "0": 11124
+        },
+        "balance_ratio": 1.0,
+        "token_count": {
+          "min": 1,
+          "median": 175,
+          "mean": 244.8,
+          "max": 3530
+        }
+      }
     }
   ]
 }
