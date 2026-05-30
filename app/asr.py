@@ -8,9 +8,8 @@ zelf, niet een verkleind cloud-model.
 
 Het model is een kant-en-klaar Kaldi/Vosk-model (`models/vosk-nl/`), geen door
 ons getrainde classifier. Wij evalueren het hier: word error rate (WER),
-modelgrootte en real-time-factor (RTF). De live mic-variant zit in
-`app/signals.py` (AudioBridge); dit bestand bevat de *bestands*-decoder + de
-evaluatie-helpers zodat het notebook reproduceerbaar kan meten.
+modelgrootte en real-time-factor (RTF). Dit bestand bevat de bestands-decoder +
+de evaluatie-helpers zodat het notebook (sectie 2.0) reproduceerbaar kan meten.
 """
 from __future__ import annotations
 

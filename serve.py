@@ -192,16 +192,3 @@ def to_prometheus_exposition(m: dict, d: dict) -> str:
 def metrics_prom():
     """Prometheus scrape-endpoint (text/plain exposition-format)."""
     return PlainTextResponse(to_prometheus_exposition(metrics.snapshot(), drift.snapshot()))
-
-
-# Serveer de web-frontend (web/) vanuit dezelfde service, NA de API-routes zodat
-# die blijven winnen. Alleen mounten als de map bestaat.
-try:
-    from pathlib import Path as _Path
-    from fastapi.staticfiles import StaticFiles
-    _web = _Path(__file__).resolve().parent / "web"
-    if _web.is_dir():
-        app.mount("/", StaticFiles(directory=str(_web), html=True), name="web")
-        log.info("web-frontend gemount op / vanuit %s", _web)
-except Exception as exc:  # pragma: no cover
-    log.warning("kon web-frontend niet mounten: %s", exc)

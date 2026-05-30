@@ -1,6 +1,6 @@
 # VitaCall
 
-Nederlandse alarmcentrale-assistent. Beller belt naar operator-dashboard. Twee onafhankelijke modellen:
+Nederlandse alarmcentrale-assistent. Twee onafhankelijke modellen voor binnenkomende gesprekken:
 
 - **Edge (lokaal op de operator-pc): Vosk-NL ASR** zet audio om naar tekst. De ruwe audio verlaat het apparaat nooit — dit is de privacy-oplossing en dit is het edge-model.
 - **Cloud: TF-IDF + Logistic Regression** sentiment/urgentie-classifier draait op de ge-de-identificeerde tekst (geen audio). Een los model met een eigen taak, data en evaluatie.
@@ -11,38 +11,26 @@ Spoed-keywords + drift-detectie draaien live op de transcript.
 
 ```powershell
 pip install -r requirements.txt
-jupyter nbconvert --to notebook --execute main.ipynb   # eenmalig: train modellen
-python start.py
+jupyter nbconvert --to notebook --execute main.ipynb   # train modellen + genereer evidence
+uvicorn serve:app --host 0.0.0.0 --port 8000           # cloud-API lokaal
 ```
 
-`start.py` opent operator + caller in twee vensters. Eén klik op de groene knop in het beller-scherm start de oproep.
-
-## Netwerk (ander apparaat als beller)
-
-Backend bindt op `0.0.0.0:8000`, dus een ander apparaat in hetzelfde LAN kan bellen:
+Of via Docker (zelfde image lokaal en in productie):
 
 ```powershell
-# Op host-pc:
-python app/ui.py                                       # operator
-# Op ander apparaat (zelfde wifi):
-python app/ui.py --mobile --api http://<host-ip>:8000  # beller
+docker compose up --build        # api + mlflow + prometheus
 ```
 
 ## Structuur
 
 ```
-main.ipynb              pipeline + training + monitoring (alle code)
-serve.py                FastAPI productie-service
-app/ui.py               operator-dashboard + beller-scherm
-app/backend.py          embedded API (health, analyze, drift, metrics, call/*)
+main.ipynb              pipeline + training + deployment + monitoring (alle code)
+serve.py                FastAPI productie-service (/health /analyze /drift /metrics)
 app/asr.py              edge ASR: Vosk-NL file-decoder + WER-harness (notebook-eval)
-app/signals.py          live mic -> Vosk-NL transcript (AudioBridge)
-app/models.py           cloud sentiment scoring + compacte tekst-fallback
-app/icons.py            vector-iconen (geen emoji)
-app/widgets.py          stijl + custom widgets
-start.py                launcher: opent beide vensters
 Dockerfile + docker-compose.yml
+k8s/deployment.yaml     alternatief deploy-manifest (2 replicas, liveness/readiness)
 .github/workflows/cicd.yml
+monitoring/             prometheus scrape-config
 evidence/               plots + rapporten (gegenereerd door notebook)
 models/vosk-nl/         edge ASR-model (Vosk-NL, ~65.6 MB)
 models/sentiment_heavy.pkl
@@ -59,7 +47,7 @@ models/sentiment_heavy.pkl
 | RTF (decode-tijd / audio-duur) op CPU | ~0.17 (≈6x sneller dan realtime) |
 | WER | gemeten via `app/asr.evaluate()` op zelf-opgenomen referentiezinnen; zonder referentie-audio status `geen_referentie_audio` |
 
-Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door via de app-microfoon een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
+Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
 
 **Cloud — sentiment/urgentie-classifier** (tekst -> label):
 
@@ -75,4 +63,4 @@ Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de rep
 
 ## Stack
 
-Python 3.11, scikit-learn, FastAPI, MLflow, PySide6, PySpark (optioneel), Optuna, Prometheus.
+Python 3.11, scikit-learn, FastAPI, MLflow, PySpark (optioneel), Optuna, Prometheus.

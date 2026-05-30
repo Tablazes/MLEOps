@@ -1,26 +1,26 @@
 {
-  "engine": "pandas (fallback: Py4JJavaError)",
+  "engine": "pandas (Spark overgeslagen: Windows zonder winutils.exe (HADOOP_HOME ontbreekt))",
   "results": [
     {
       "batch_size": 1000,
       "rows": 22252,
-      "elapsed_s": 2.08,
-      "throughput_rps": 10712,
-      "rss_delta_mb": -61.4
+      "elapsed_s": 4.0,
+      "throughput_rps": 5561,
+      "rss_delta_mb": -74.0
     },
     {
       "batch_size": 5000,
       "rows": 22252,
-      "elapsed_s": 2.56,
-      "throughput_rps": 8680,
-      "rss_delta_mb": 61.1
+      "elapsed_s": 3.81,
+      "throughput_rps": 5836,
+      "rss_delta_mb": 27.1
     },
     {
       "batch_size": 20000,
       "rows": 22252,
-      "elapsed_s": 2.38,
-      "throughput_rps": 9332,
-      "rss_delta_mb": -5.5
+      "elapsed_s": 4.18,
+      "throughput_rps": 5321,
+      "rss_delta_mb": 27.5
     }
   ]
 }

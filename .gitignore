@@ -25,3 +25,5 @@ main_executed.ipynb
 
 # Vosk-NL ASR model (66MB, te groot voor git)
 models/vosk-nl/
+nbexec_2026-05-30.log
+_executed*.ipynb
