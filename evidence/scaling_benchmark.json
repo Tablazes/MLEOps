@@ -4,26 +4,26 @@
     {
       "batch_size": 1000,
       "rows": 22252,
-      "elapsed_s": 2.49,
-      "throughput_rps": 8932,
-      "peak_rss_mb": 745.4,
-      "rss_before_mb": 745.1
+      "elapsed_s": 6.68,
+      "throughput_rps": 3328,
+      "peak_rss_mb": 743.4,
+      "rss_before_mb": 742.6
     },
     {
       "batch_size": 5000,
       "rows": 22252,
-      "elapsed_s": 2.42,
-      "throughput_rps": 9213,
-      "peak_rss_mb": 756.5,
-      "rss_before_mb": 690.4
+      "elapsed_s": 6.33,
+      "throughput_rps": 3516,
+      "peak_rss_mb": 721.1,
+      "rss_before_mb": 669.0
     },
     {
       "batch_size": 20000,
       "rows": 22252,
-      "elapsed_s": 2.37,
-      "throughput_rps": 9383,
-      "peak_rss_mb": 851.6,
-      "rss_before_mb": 734.2
+      "elapsed_s": 5.67,
+      "throughput_rps": 3923,
+      "peak_rss_mb": 858.0,
+      "rss_before_mb": 721.1
     }
   ]
 }
