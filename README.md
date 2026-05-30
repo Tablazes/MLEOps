@@ -26,7 +26,6 @@ docker compose up --build        # api + mlflow + prometheus
 ```
 main.ipynb              pipeline + training + deployment + monitoring (alle code)
 serve.py                FastAPI productie-service (/health /analyze /drift /metrics)
-app/asr.py              edge ASR: Vosk-NL file-decoder + WER-harness (notebook-eval)
 Dockerfile + docker-compose.yml
 k8s/deployment.yaml     alternatief deploy-manifest (2 replicas, liveness/readiness)
 .github/workflows/cicd.yml
@@ -45,7 +44,7 @@ models/sentiment_heavy.pkl
 | Modelgrootte op schijf | 65.6 MB |
 | Laadtijd | ~0.4 s |
 | RTF (decode-tijd / audio-duur) op CPU | ~0.17 (≈6x sneller dan realtime) |
-| WER | gemeten via `app/asr.evaluate()` op zelf-opgenomen referentiezinnen; zonder referentie-audio status `geen_referentie_audio` |
+| WER | gemeten via de inline WER-harness in het notebook (sectie 2.0) op zelf-opgenomen referentiezinnen; zonder referentie-audio status `geen_referentie_audio` |
 
 Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
 
