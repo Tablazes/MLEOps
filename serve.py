@@ -1,15 +1,19 @@
-"""Productie-entry voor de FastAPI-service.
+"""VitaCall service-laag: single source of truth voor de cloud-API.
 
-Identieke logica als de cellen 4.x in main.ipynb, maar zonder Jupyter.
-Run: uvicorn serve:app --host 0.0.0.0 --port 8000
+Eén module die zowel het notebook als de productie-container gebruikt, zodat de
+service-logica (keywords, monitoring, drift, Prometheus-export, FastAPI-app) op
+exact één plek staat. Geen duplicatie tussen `main.ipynb` en deze file.
+
+- Notebook: importeert `build_app`, `Metrics`, `DriftDetector`,
+  `to_prometheus_exposition` en geeft het in-memory getrainde model door.
+- Container (Dockerfile / Render): importeert `app` hieronder, dat het model uit
+  `MODEL_PATH` laadt. Start met `uvicorn serve:app --host 0.0.0.0 --port 8000`.
 """
-import json
 import logging
 import os
 import pickle
 import time
 from collections import deque
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from fastapi import FastAPI, HTTPException
@@ -18,15 +22,14 @@ from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
 log = logging.getLogger("vitacall")
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/sentiment_heavy.pkl")
 
-with open(MODEL_PATH, "rb") as f:
-    model = pickle.load(f)
-log.info("Model geladen uit %s", MODEL_PATH)
 
-
+# --------------------------------------------------------------------------- #
+# Domein-keywords (zorg-context)
+# --------------------------------------------------------------------------- #
 KEYWORDS_NL = {
     "urgentie": [
         "pijn op de borst", "borstpijn", "benauwd", "bewusteloos",
@@ -41,20 +44,27 @@ KEYWORDS_NL = {
 
 
 def find_keywords(text: str):
+    """Zoek domein-keywords voor highlighting in de output."""
     t = text.lower()
     return [{"text": kw, "type": ktype}
             for ktype, kws in KEYWORDS_NL.items()
             for kw in kws if kw in t]
 
 
-def predict_sentiment(text: str):
+def predict_sentiment(model, text: str):
+    """Wrapper rond model.predict_proba die een leesbaar label teruggeeft."""
     proba = model.predict_proba([text])[0]
     label_int = model.classes_[proba.argmax()]
     return ("positief" if label_int == 1 else "negatief"), round(float(proba.max()), 3)
 
 
+# --------------------------------------------------------------------------- #
+# Monitoring: Metrics + DriftDetector (ook gebruikt door notebook-sectie 4)
+# --------------------------------------------------------------------------- #
 @dataclass
 class Metrics:
+    """System- + model-counters. Een deque met maxlen werkt als ringbuffer:
+    oude metingen vallen er vanzelf uit."""
     requests_total: int = 0
     requests_errors: int = 0
     latencies_ms: deque = field(default_factory=lambda: deque(maxlen=200))
@@ -68,6 +78,7 @@ class Metrics:
         self.latencies_ms.append(latency_ms)
 
     def record_prediction(self, label, confidence):
+        # Voor avg-confidence in de snapshot; handig om model-rot vroeg te zien.
         self.confidences.append(confidence)
 
     def snapshot(self):
@@ -86,6 +97,7 @@ class Metrics:
 
 @dataclass
 class DriftDetector:
+    """Output-distributie drift: hoever wijkt de positieve-rate af van 0.5."""
     window: deque = field(default_factory=lambda: deque(maxlen=100))
     threshold: float = 0.30
     min_samples: int = 10
@@ -107,10 +119,33 @@ class DriftDetector:
                 "drift_score": round(score, 3), "samples": n}
 
 
-metrics = Metrics()
-drift = DriftDetector()
+def to_prometheus_exposition(metrics_snapshot: dict, drift_snapshot: dict) -> str:
+    """Zet metrics+drift om naar Prometheus exposition-format (text/plain).
+
+    Eén HELP/TYPE/value-blok per metric, zodat een Prometheus-server dit kan
+    scrapen op /metrics-prom (zie monitoring/prometheus.yml).
+    """
+    lines = []
+
+    def m(name, help_text, mtype, val):
+        lines.append(f"# HELP {name} {help_text}")
+        lines.append(f"# TYPE {name} {mtype}")
+        lines.append(f"{name} {val}")
+
+    m("vitacall_uptime_seconds", "Process uptime", "gauge", metrics_snapshot.get("uptime_s", 0))
+    m("vitacall_requests_total", "Total HTTP requests", "counter", metrics_snapshot.get("requests_total", 0))
+    m("vitacall_requests_errors_total", "Total errored requests", "counter", metrics_snapshot.get("requests_errors", 0))
+    m("vitacall_latency_p50_ms", "p50 request latency in ms", "gauge", metrics_snapshot.get("p50_ms", 0))
+    m("vitacall_latency_p95_ms", "p95 request latency in ms", "gauge", metrics_snapshot.get("p95_ms", 0))
+    m("vitacall_avg_confidence", "Mean prediction confidence", "gauge", metrics_snapshot.get("avg_confidence", 0))
+    m("vitacall_drift_score", "Output-distribution drift score", "gauge", drift_snapshot.get("drift_score", 0))
+    m("vitacall_drift_samples", "Samples in drift window", "gauge", drift_snapshot.get("samples", 0))
+    return "\n".join(lines) + "\n"
 
 
+# --------------------------------------------------------------------------- #
+# Request/response-contract
+# --------------------------------------------------------------------------- #
 class AnalyzeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=10_000)
 
@@ -121,74 +156,75 @@ class AnalyzeResponse(BaseModel):
     keywords: list
 
 
-app = FastAPI(title="VitaCall API", version="2.0.0")
+def build_app(model, *, metrics: "Metrics | None" = None,
+              drift: "DriftDetector | None" = None) -> FastAPI:
+    """Bouw de FastAPI-app rond een geladen model.
 
-# CORS open voor lokale PySide6 desktop-app. In productie zou je dit
-# beperken tot het exacte origin van de frontend.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "POST"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/health")
-def health():
-    return {"status": "healthy", "model_loaded": model is not None}
-
-
-@app.post("/analyze", response_model=AnalyzeResponse)
-def analyze(req: AnalyzeRequest):
-    t0 = time.perf_counter()
-    err = False
-    try:
-        sentiment, confidence = predict_sentiment(req.text)
-        drift.add(sentiment)
-        metrics.record_prediction(sentiment, confidence)
-        return AnalyzeResponse(sentiment=sentiment, confidence=confidence,
-                               keywords=find_keywords(req.text))
-    except Exception:
-        err = True
-        raise HTTPException(status_code=500, detail="Interne fout bij scoring")
-    finally:
-        metrics.record_request((time.perf_counter() - t0) * 1000, error=err)
-
-
-@app.get("/drift")
-def drift_endpoint():
-    return drift.snapshot()
-
-
-@app.get("/metrics")
-def metrics_endpoint():
-    return metrics.snapshot()
-
-
-def to_prometheus_exposition(m: dict, d: dict) -> str:
-    """Zet metrics+drift om naar Prometheus exposition-format (text/plain).
-
-    Eén regel per metric met HELP/TYPE, zodat een Prometheus-server dit kan
-    scrapen op /metrics-prom (zie monitoring/prometheus.yml).
+    Het notebook geeft hier het in-memory getrainde model door; de container
+    geeft het uit MODEL_PATH geladen model door. Eén app-definitie voor beide.
+    De gebruikte Metrics/DriftDetector-instanties worden teruggehangen op
+    `app.state` zodat aanroepers (notebook-sectie 4) de live snapshots kunnen
+    uitlezen.
     """
-    lines = []
-    fields = {
-        "vitacall_requests_total": m["requests_total"],
-        "vitacall_requests_errors": m["requests_errors"],
-        "vitacall_error_rate": m["error_rate"],
-        "vitacall_latency_p50_ms": m["p50_ms"],
-        "vitacall_latency_p95_ms": m["p95_ms"],
-        "vitacall_avg_confidence": m["avg_confidence"],
-        "vitacall_drift_score": d["drift_score"],
-        "vitacall_positive_rate": d["positive_rate"],
-    }
-    for name, value in fields.items():
-        lines.append(f"# TYPE {name} gauge")
-        lines.append(f"{name} {value}")
-    return "\n".join(lines) + "\n"
+    metrics = metrics or Metrics()
+    drift = drift or DriftDetector()
+
+    app = FastAPI(title="VitaCall API", version="2.0.0")
+    app.state.metrics = metrics
+    app.state.drift = drift
+
+    # CORS open zodat een externe edge-client of dashboard de API mag bevragen.
+    # In productie beperk je dit tot het exacte origin van de consument.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+
+    @app.get("/health")
+    def health():
+        return {"status": "healthy", "model_loaded": model is not None}
+
+    @app.post("/analyze", response_model=AnalyzeResponse)
+    def analyze(req: AnalyzeRequest):
+        t0 = time.perf_counter()
+        err = False
+        try:
+            sentiment, confidence = predict_sentiment(model, req.text)
+            drift.add(sentiment)
+            metrics.record_prediction(sentiment, confidence)
+            return AnalyzeResponse(sentiment=sentiment, confidence=confidence,
+                                   keywords=find_keywords(req.text))
+        except Exception:
+            err = True
+            raise HTTPException(status_code=500, detail="Interne fout bij scoring")
+        finally:
+            metrics.record_request((time.perf_counter() - t0) * 1000, error=err)
+
+    @app.get("/drift")
+    def drift_endpoint():
+        return drift.snapshot()
+
+    @app.get("/metrics")
+    def metrics_endpoint():
+        return metrics.snapshot()
+
+    @app.get("/metrics-prom")
+    def metrics_prom():
+        """Prometheus scrape-endpoint (text/plain exposition-format)."""
+        return PlainTextResponse(to_prometheus_exposition(metrics.snapshot(), drift.snapshot()))
+
+    return app
 
 
-@app.get("/metrics-prom")
-def metrics_prom():
-    """Prometheus scrape-endpoint (text/plain exposition-format)."""
-    return PlainTextResponse(to_prometheus_exposition(metrics.snapshot(), drift.snapshot()))
+def _load_model(path: str):
+    with open(path, "rb") as f:
+        m = pickle.load(f)
+    log.info("Model geladen uit %s", path)
+    return m
+
+
+# Container-entry: laadt het model uit MODEL_PATH en bouwt de app.
+# Het notebook gebruikt build_app() rechtstreeks en raakt dit niet aan.
+app = build_app(_load_model(MODEL_PATH)) if os.path.exists(MODEL_PATH) else None
