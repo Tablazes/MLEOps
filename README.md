@@ -1,5 +1,9 @@
 # VitaCall
 
+[![CI/CD](https://github.com/Tablazes/MLEOps/actions/workflows/cicd.yml/badge.svg)](https://github.com/Tablazes/MLEOps/actions/workflows/cicd.yml)
+
+**Live cloud-API:** https://mleops.onrender.com (Render, Docker, free tier) — endpoints `/health`, `/analyze`, `/metrics`, `/metrics-prom`.
+
 Nederlandse alarmcentrale-assistent. Twee onafhankelijke modellen voor binnenkomende gesprekken:
 
 - **Edge (lokaal op de operator-pc): Vosk-NL ASR** zet audio om naar tekst. De ruwe audio verlaat het apparaat nooit — dit is de privacy-oplossing en dit is het edge-model.

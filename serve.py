@@ -182,6 +182,12 @@ def build_app(model, *, metrics: "Metrics | None" = None,
         allow_headers=["*"],
     )
 
+    @app.get("/")
+    def root():
+        # Nette landingsroute i.p.v. een kale 404 op de root.
+        return {"service": "VitaCall API", "status": "ok",
+                "endpoints": ["/health", "/analyze", "/drift", "/metrics", "/metrics-prom"]}
+
     @app.get("/health")
     def health():
         return {"status": "healthy", "model_loaded": model is not None}

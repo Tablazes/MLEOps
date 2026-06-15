@@ -1,5 +1,5 @@
 {
-  "target": "local-inprocess",
+  "target": "https://mleops.onrender.com",
   "health": {
     "status": "healthy",
     "model_loaded": true

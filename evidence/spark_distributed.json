@@ -1,0 +1,10 @@
+{
+  "engine": "PySpark 4.0.0 (local[*], distributed)",
+  "rows": 22249,
+  "partitions": 8,
+  "split": {
+    "train": 17914,
+    "val": 2140,
+    "test": 2195
+  }
+}
