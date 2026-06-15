@@ -1,0 +1,21 @@
+{
+  "target": "local-inprocess",
+  "health": {
+    "status": "healthy",
+    "model_loaded": true
+  },
+  "analyze": {
+    "sentiment": "negatief",
+    "confidence": 0.992,
+    "keywords": [
+      {
+        "text": "pijn op de borst",
+        "type": "urgentie"
+      },
+      {
+        "text": "niet ademen",
+        "type": "urgentie"
+      }
+    ]
+  }
+}

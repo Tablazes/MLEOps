@@ -1,0 +1,7 @@
+{
+  "docker_available": false,
+  "image": "vitacall:edge",
+  "health": null,
+  "analyze": null,
+  "offline": true
+}
