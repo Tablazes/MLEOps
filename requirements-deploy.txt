@@ -1,0 +1,8 @@
+# Runtime-only dependencies voor de cloud/edge-container (serve.py).
+# Bewust slank: geen training-, Spark-, MLflow- of desktop-libraries, zodat
+# de image klein blijft en snel bouwt op Render / edge-node.
+scikit-learn==1.5.2
+numpy==1.26.4
+fastapi==0.115.0
+uvicorn==0.34.0
+pydantic==2.9.2

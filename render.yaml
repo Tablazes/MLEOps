@@ -1,0 +1,14 @@
+# Render Blueprint (Infrastructure-as-Code) voor de VitaCall cloud-API.
+# Op render.com -> "New +" -> "Blueprint" -> deze repo kiezen. Render bouwt de
+# Dockerfile en deployt de service. De live publieke URL komt op het dashboard.
+services:
+  - type: web
+    name: vitacall-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: MODEL_PATH
+        value: /app/models/sentiment_heavy.pkl
