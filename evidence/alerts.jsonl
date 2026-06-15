@@ -1,3 +1,4 @@
-{"name": "HighErrorRate", "severity": "critical", "condition": "error_rate > 5%", "fired_at": 1781520953.262896}
-{"name": "HighLatency", "severity": "warning", "condition": "p95_latency > 500ms", "fired_at": 1781520953.2628994}
-{"name": "ModelDrift", "severity": "warning", "condition": "drift_score > 0.3", "fired_at": 1781520953.2629008}
+{"name": "HighErrorRate", "severity": "critical", "condition": "error_rate > 5%", "fired_at": 1781532105.0650606}
+{"name": "HighLatency", "severity": "warning", "condition": "p95_latency > 500ms", "fired_at": 1781532105.065063}
+{"name": "ModelDrift", "severity": "warning", "condition": "drift_score > 0.3", "fired_at": 1781532105.0650635}
+{"scope": "live_snapshot", "alerts": 0, "error_rate": 0.0, "drift_score": 0.1}

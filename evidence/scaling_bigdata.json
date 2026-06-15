@@ -1,0 +1,7 @@
+{
+  "rows": 1112600,
+  "tiles": 50,
+  "throughput_rows_per_sec": 6320,
+  "peak_rss_mb": 2000.2,
+  "conclusie": "piek-RSS vlak bij ~50x meer rijen -> streaming is geheugen-begrensd"
+}

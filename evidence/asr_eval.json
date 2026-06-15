@@ -1,0 +1,11 @@
+{
+  "published_wer_pct": [
+    22.45,
+    26.8
+  ],
+  "published_wer_best": 22.45,
+  "bron": "models/vosk-nl/README (Alpha Cephei Vosk small-nl)",
+  "harness_selfcheck": "pass",
+  "model_size_mb": 65.6,
+  "rtf_cpu": 0.17
+}

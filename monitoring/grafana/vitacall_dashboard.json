@@ -1,0 +1,74 @@
+{
+  "title": "VitaCall Production",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests per second",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "rate(vitacall_requests_total[1m])"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Error rate",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "rate(vitacall_requests_errors_total[5m]) / rate(vitacall_requests_total[5m])"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p50 / p95 latency",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "vitacall_latency_p50_ms"
+        },
+        {
+          "expr": "vitacall_latency_p95_ms"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Drift score",
+      "type": "gauge",
+      "targets": [
+        {
+          "expr": "vitacall_drift_score"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Mean confidence",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr": "vitacall_avg_confidence"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Uptime",
+      "type": "stat",
+      "targets": [
+        {
+          "expr": "vitacall_uptime_seconds"
+        }
+      ]
+    }
+  ]
+}

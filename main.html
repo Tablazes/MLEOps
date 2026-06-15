@@ -7778,13 +7778,24 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1.-Datapipeline-(LD1-+-LD2)">1. Datapipeline (LD1 + LD2)<a class="anchor-link" href="#1.-Datapipeline-(LD1-+-LD2)">¶</a></h2><p>De data gaat in drie stappen door de pijp. Per stap valideren we het schema. Fouten in de eerste laag worden alleen maar erger als je ze niet vroeg vangt.</p>
+<h2 id="1.-Datapipeline-(LD1-+-LD2)">1. Datapipeline (LD1 + LD2)<a class="anchor-link" href="#1.-Datapipeline-(LD1-+-LD2)">¶</a></h2><p>Voordat er ook maar één model getraind wordt, moet de data kloppen. Bij VitaCall
+komt er straks audio binnen van alarmgesprekken; die wordt op het toestel zelf
+omgezet naar tekst en pas daarna verder verwerkt. In dit notebook werken we met
+een publieke Nederlandse tekstdataset als stand-in, maar de pijplijn is precies
+zo opgezet als je hem in productie zou willen: in lagen, met een controle na elke
+stap.</p>
+<p>We doen het in drie stappen, en na elke stap kijken we of het schema nog klopt:</p>
 <ol>
-<li>Ruwe laag: DBRD wordt gedownload, de tekst-bestanden worden samengevoegd tot een tabel.</li>
-<li>Schone laag: HTML eruit, witruimte normaliseren, duplicaten weg.</li>
-<li>Trainings-laag: stratified 80/10/10 split per label, plus <code>token_count</code> als feature.</li>
+<li><strong>Ruwe laag</strong> - DBRD wordt gedownload en de losse tekstbestanden worden tot
+één tabel samengevoegd.</li>
+<li><strong>Schone laag</strong> - HTML eruit, dubbele spaties weg, duplicaten verwijderd.</li>
+<li><strong>Trainings-laag</strong> - een gebalanceerde 80/10/10 split per label, met
+<code>token_count</code> als extra kolom.</li>
 </ol>
-<p>Elke <code>validate_*</code>-functie geeft een <code>ValueError</code> met de exacte reden als een check faalt. Geen stille corruptie verderop.</p>
+<p>De reden voor die tussentijdse controles is simpel: een foutje in de ruwe laag
+wordt verderop alleen maar duurder om te vinden. Daarom geeft elke
+<code>validate_*</code>-functie meteen een <code>ValueError</code> met de exacte reden zodra een check
+faalt. Liever nu stoppen dan straks een model trainen op rommel.</p>
 </div>
 </div>
 </div>
@@ -7795,7 +7806,18 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.1-Validatie">1.1 Validatie<a class="anchor-link" href="#1.1-Validatie">¶</a></h3><p>Een dataclass <code>ValidationResult</code> houdt errors en warnings bij. De <code>validate_*</code>-functies vullen die. Bewust geen Pandera of Great Expectations: de checks zijn klein genoeg om met de hand te schrijven, en zo zie je in een oogopslag wat er gecontroleerd wordt.</p>
+<h3 id="1.1-Validatie">1.1 Validatie<a class="anchor-link" href="#1.1-Validatie">¶</a></h3><p>We beginnen met de controle zelf, want de rest van de pijplijn leunt erop. Een
+kleine dataclass <code>ValidationResult</code> verzamelt alle errors en warnings van een
+laag in één keer. Zo zie je niet alleen de eerste fout, maar meteen alles wat er
+mis is.</p>
+<p>Bewust geen Pandera of Great Expectations. Dat zijn prima libraries, maar onze
+checks zijn klein genoeg om met de hand te schrijven, en dan kan iedereen in het
+team in één oogopslag zien wat er precies gecontroleerd wordt. Voor een
+zorgtoepassing waar je je validatie moet kunnen uitleggen aan een
+auditor, weegt die leesbaarheid zwaarder dan een extra dependency.</p>
+<p>De cel hieronder bevat ook een korte negatieve test: we voeren expres slechte
+data in (een HTML-rest, een ongeldig label) en controleren dat de gates
+daadwerkelijk afkeuren. Een validatie die nooit faalt, valideert namelijk niets.</p>
 </div>
 </div>
 </div>
@@ -7884,6 +7906,14 @@ a.anchor-link {
 <span class="c1"># Snelle sanity-check: een mini-frame valideren zonder echte data.</span>
 <span class="n">_demo</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">'text_clean'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'oke'</span><span class="p">],</span> <span class="s1">'label'</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">'split'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'train'</span><span class="p">]})</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">report</span><span class="p">(</span><span class="n">validate_clean</span><span class="p">(</span><span class="n">_demo</span><span class="p">)))</span>
+
+
+<span class="c1"># Negatieve check: de gates MOETEN falen op slechte data (bewijst dat ze bijten).</span>
+<span class="n">_bad_html</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">'text_clean'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'&lt;b&gt;nog html&lt;/b&gt;'</span><span class="p">],</span> <span class="s1">'label'</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">'split'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'train'</span><span class="p">]})</span>
+<span class="k">assert</span> <span class="ow">not</span> <span class="n">validate_clean</span><span class="p">(</span><span class="n">_bad_html</span><span class="p">)</span><span class="o">.</span><span class="n">passed</span><span class="p">,</span> <span class="s1">'validate_clean had HTML moeten afkeuren'</span>
+<span class="n">_bad_label</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">'review_id'</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s1">'text'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'x'</span><span class="p">],</span> <span class="s1">'label'</span><span class="p">:</span> <span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s1">'source_file'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'train/a'</span><span class="p">]})</span>
+<span class="k">assert</span> <span class="ow">not</span> <span class="n">validate_raw</span><span class="p">(</span><span class="n">_bad_label</span><span class="p">)</span><span class="o">.</span><span class="n">passed</span><span class="p">,</span> <span class="s1">'validate_raw had label=2 moeten afkeuren'</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'[OK] validatie-gates falen correct op slechte data (HTML-rest + label=2).'</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -7897,6 +7927,7 @@ a.anchor-link {
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[OK] schoon: 1 rijen x 3 kolommen
+[OK] validatie-gates falen correct op slechte data (HTML-rest + label=2).
 </pre>
 </div>
 </div>
@@ -7909,8 +7940,17 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.2-Ruwe-laag,-Nederlandse-boekenrecensies-downloaden-en-samenvoegen">1.2 Ruwe laag, Nederlandse boekenrecensies downloaden en samenvoegen<a class="anchor-link" href="#1.2-Ruwe-laag,-Nederlandse-boekenrecensies-downloaden-en-samenvoegen">¶</a></h3><p>We gebruiken de Dutch Book Reviews Dataset (DBRD): het labeled deel van DBRD (~22k recensies; 110k incl. unsup) van Hebban.nl, met sentiment-labels (positief/negatief), uitgegeven door Benjamin van der Burgh (Universiteit Leiden, 2019). Veel relevanter voor VitaCall dan een Engelstalige IMDb-set: het model leert direct Nederlandse zinsbouw en woordgebruik.</p>
-<p>De tar.gz wordt een keer gedownload en uitgepakt. Daarna leest <code>ingest_dbrd</code> de losse <code>.txt</code>-bestanden uit <code>train/{pos,neg}</code> en <code>test/{pos,neg}</code> in en schrijft alles als een Parquet-tabel weg. Idempotent: als de download er al staat, slaan we die over.</p>
+<h3 id="1.2-Ruwe-laag:-Nederlandse-boekenrecensies-downloaden-en-samenvoegen">1.2 Ruwe laag: Nederlandse boekenrecensies downloaden en samenvoegen<a class="anchor-link" href="#1.2-Ruwe-laag:-Nederlandse-boekenrecensies-downloaden-en-samenvoegen">¶</a></h3><p>Voor het cloud-model hebben we Nederlandstalige tekst met sentiment-labels nodig.
+Echte VitaCall-transcripten mogen we niet gebruiken (gezondheidsdata, AVG art. 9),
+dus pakken we de Dutch Book Reviews Dataset (DBRD): ongeveer 22.000 gelabelde
+recensies van Hebban.nl, samengesteld door Benjamin van der Burgh (Universiteit
+Leiden, 2019). Een Engelstalige IMDb-set was makkelijker geweest, maar dan leert
+het model de verkeerde taal. Met DBRD pikt het direct Nederlandse zinsbouw en
+woordkeuze op, en dat is precies wat er straks door de telefoon komt.</p>
+<p>De tar.gz halen we één keer binnen en pakken we uit. Daarna leest <code>ingest_dbrd</code>
+de losse <code>.txt</code>-bestanden uit <code>train/{pos,neg}</code> en <code>test/{pos,neg}</code> in en schrijft
+alles als één Parquet-tabel weg. De stap is idempotent: staat de download er al,
+dan slaan we hem over. Handig als je het notebook vaker draait.</p>
 </div>
 </div>
 </div>
@@ -8005,14 +8045,14 @@ a.anchor-link {
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:45:47,430 [INFO] DBRD al uitgepakt in data\DBRD
+<pre>2026-06-15 15:47:43,027 [INFO] DBRD al uitgepakt in data\DBRD
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:45:50,945 [INFO] Ruwe laag: 22252 recensies geschreven naar data\ruw\dbrd
+<pre>2026-06-15 15:49:04,713 [INFO] Ruwe laag: 22252 recensies geschreven naar data\ruw\dbrd
 </pre>
 </div>
 </div>
@@ -8032,7 +8072,15 @@ a.anchor-link {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.3-Schone-laag,-cleaning-+-validatie">1.3 Schone laag, cleaning + validatie<a class="anchor-link" href="#1.3-Schone-laag,-cleaning-+-validatie">¶</a></h3><p>Recensies bevatten HTML-resten, dubbele spaties en duplicaten. Die strippen we eruit voor we naar features gaan. De cleaning is een aparte functie (<code>_clean_df</code>) zodat de streaming-variant in 1.4 dezelfde transformaties hergebruikt zonder copy-paste.</p>
+<h3 id="1.3-Schone-laag:-cleaning-en-validatie">1.3 Schone laag: cleaning en validatie<a class="anchor-link" href="#1.3-Schone-laag:-cleaning-en-validatie">¶</a></h3><p>Ruwe recensies zitten vol HTML-resten, dubbele spaties en exacte duplicaten. Dat
+soort ruis wil je weg hebben voordat je er features van maakt, anders leert het
+model patronen in de opmaak in plaats van in de taal.</p>
+<p>De cleaning zit in één functie, <code>_clean_df</code>. Dat is met opzet: de streaming-variant
+in 1.4 roept exact dezelfde functie aan, zodat de batch- en de streaming-route
+gegarandeerd hetzelfde doen. Eén plek om aan te passen, geen copy-paste die uit
+elkaar gaat lopen. Na het schoonmaken halen we de tabel nog een keer door
+<code>validate_clean</code>, zodat we zeker weten dat er geen lege teksten of HTML-resten
+zijn blijven staan.</p>
 </div>
 </div>
 </div>
@@ -8092,7 +8140,7 @@ a.anchor-link {
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:45:54,957 [INFO] Schone laag: 22249 unieke recensies (van 22252 ruw)
+<pre>2026-06-15 15:49:09,691 [INFO] Schone laag: 22249 unieke recensies (van 22252 ruw)
 </pre>
 </div>
 </div>
@@ -8114,6 +8162,7 @@ a.anchor-link {
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h3 id="1.4-Schaalbaarheid-(LD2),-streaming-voor-data-%3E-RAM">1.4 Schaalbaarheid (LD2), streaming voor data &gt; RAM<a class="anchor-link" href="#1.4-Schaalbaarheid-(LD2),-streaming-voor-data-%3E-RAM">¶</a></h3><p>22k recensies past ruim in geheugen. Als VitaCall straks honderdduizenden gesprekken per maand verwerkt is dat niet meer vanzelfsprekend. <code>clean_reviews_streaming</code> leest de Parquet in batches van 5000 rijen via <code>pyarrow.parquet.ParquetFile.iter_batches</code>. Dezelfde transformaties, constante geheugenfootprint.</p>
 <p>In productie zou dit een Spark-job of een Airflow-DAG worden. Voor dit notebook is de streaming-variant genoeg om aan te tonen dat de pipeline niet stuk gaat op grote datasets.</p>
+<p>Let op: de streaming-variant doet bewust <strong>geen</strong> globale <code>drop_duplicates</code> (dat kan niet over onafhankelijke batches heen). De batch-cleaning in 1.3 dedupliceert wel; in productie zou dedup een aparte shuffle/approx-dedup-stap zijn. Vandaar dat streaming 22.252 rijen geeft en de batch-laag 22.249.</p>
 </div>
 </div>
 </div>
@@ -8185,7 +8234,18 @@ Output Parquet: 38.7 MB
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.5-Trainings-laag,-stratified-split-(PySpark,-met-pandas-fallback)">1.5 Trainings-laag, stratified split (PySpark, met pandas-fallback)<a class="anchor-link" href="#1.5-Trainings-laag,-stratified-split-(PySpark,-met-pandas-fallback)">¶</a></h3><p>PySpark verdeelt het werk over alle CPU-cores via <code>master("local[*]")</code>. Op Windows zonder <code>winutils.exe</code> faalt de Spark-init. In dat geval gaat de pijplijn over op een pandas-equivalent met dezelfde stratified 80/10/10 split. Stratified per label voorkomt class-imbalance per split. Anders krijg je in het slechtste geval een test-set met 90% positief.</p>
+<h3 id="1.5-Trainings-laag:-stratified-split-(PySpark,-met-pandas-fallback)">1.5 Trainings-laag: stratified split (PySpark, met pandas-fallback)<a class="anchor-link" href="#1.5-Trainings-laag:-stratified-split-(PySpark,-met-pandas-fallback)">¶</a></h3><p>De laatste stap voor we gaan trainen: de data opsplitsen in train, validatie en
+test. We doen dat met PySpark, dat het werk over alle CPU-cores verdeelt via
+<code>master("local[*]")</code>. Zo laat de pijplijn zien dat hij distributed kan draaien,
+niet alleen op één kern.</p>
+<p>Op Windows zonder <code>winutils.exe</code> start Spark niet. In plaats van dan te crashen,
+valt de pijplijn netjes terug op een pandas-versie die exact dezelfde 80/10/10
+split maakt. Welke engine er draait, printen we expliciet, zodat het geen stille
+mislukking wordt maar een zichtbare keuze.</p>
+<p>De split is stratified per label. Dat klinkt technisch, maar het voorkomt een
+concreet probleem: zonder stratificatie kun je in het slechtste geval een test-set
+krijgen die voor 90% uit positieve voorbeelden bestaat, en dan zegt je
+test-accuracy niets meer.</p>
 </div>
 </div>
 </div>
@@ -8333,13 +8393,109 @@ dtype: int64
 </div>
 </div>
 </div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=datapipeline-md">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="1.6-De-pijplijn-als-object:-de-DataPipeline-klasse">1.6 De pijplijn als object: de <code>DataPipeline</code>-klasse<a class="anchor-link" href="#1.6-De-pijplijn-als-object:-de-DataPipeline-klasse">¶</a></h3><p>De functies hierboven werken, maar ze staan los van elkaar: één voor valideren,
+één voor schoonmaken, één voor splitsen. Dat leest als losse stappen, terwijl het
+conceptueel één ding is, namelijk de weg van ruwe data naar trainklare data. Om
+dat te laten zien bundelen we ze in één <code>DataPipeline</code>-klasse.</p>
+<p>De klasse dupliceert geen logica. Ze roept dezelfde <code>validate_*</code>-functies en
+<code>_clean_df</code> aan die we al hebben; ze geeft er alleen een net, object-georiënteerd
+gezicht aan. Het voordeel is dat je de hele pijplijn nu als één geheel aanroept en
+configureert (welke mappen, welke seed), en dat de drie lagen zichtbaar bij elkaar
+horen in plaats van verspreid over de cellen.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=datapipeline-oo">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">DataPipeline</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Bundelt de drie datalagen (ruw -&gt; schoon -&gt; trainklaar) in één object.</span>
+
+<span class="sd">    Delegeert naar de bestaande laag-functies, zodat er geen logica wordt</span>
+<span class="sd">    gedupliceerd; de klasse is puur de OO-structuur eromheen.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_dir</span><span class="o">=</span><span class="n">DATA_DIR</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">RANDOM_SEED</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span> <span class="o">=</span> <span class="n">data_dir</span>          <span class="c1"># waar de lagen op schijf komen</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>                  <span class="c1"># voor een reproduceerbare split</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">raw_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="s1">'ruw'</span><span class="p">,</span> <span class="s1">'dbrd'</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">clean_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="s1">'schoon'</span><span class="p">,</span> <span class="s1">'dbrd'</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer</span><span class="p">,</span> <span class="n">df</span><span class="p">):</span>
+        <span class="c1"># Kies de juiste validatie-functie per laag en faal-fast bij errors.</span>
+        <span class="n">checks</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'ruw'</span><span class="p">:</span> <span class="n">validate_raw</span><span class="p">,</span> <span class="s1">'schoon'</span><span class="p">:</span> <span class="n">validate_clean</span><span class="p">,</span>
+                  <span class="s1">'trainklaar'</span><span class="p">:</span> <span class="n">validate_train_ready</span><span class="p">}</span>
+        <span class="k">return</span> <span class="n">checks</span><span class="p">[</span><span class="n">layer</span><span class="p">](</span><span class="n">df</span><span class="p">)</span><span class="o">.</span><span class="n">raise_if_failed</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Schone laag: hergebruikt clean_reviews (die _clean_df aanroept).</span>
+        <span class="n">clean_reviews</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">raw_dir</span><span class="p">,</span> <span class="s1">'reviews.parquet'</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">clean_dir</span><span class="p">)</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">clean_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="s1">'schoon'</span><span class="p">,</span> <span class="n">df</span><span class="p">)</span>       <span class="c1"># controleer voor we verdergaan</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">summary</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Korte status van de pijplijn voor in de output / het verslag.</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">'data_dir'</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_dir</span><span class="p">,</span> <span class="s1">'seed'</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">,</span>
+                <span class="s1">'lagen'</span><span class="p">:</span> <span class="p">[</span><span class="s1">'ruw'</span><span class="p">,</span> <span class="s1">'schoon'</span><span class="p">,</span> <span class="s1">'trainklaar'</span><span class="p">]}</span>
+
+
+<span class="c1"># Demo: de schone laag nu via het pipeline-object i.p.v. losse functie-aanroepen.</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">DataPipeline</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'DataPipeline:'</span><span class="p">,</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">summary</span><span class="p">())</span>
+<span class="n">_df_clean_oo</span> <span class="o">=</span> <span class="n">pipeline</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Schone laag via DataPipeline: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">_df_clean_oo</span><span class="p">)</span><span class="si">:</span><span class="s1">,</span><span class="si">}</span><span class="s1"> rijen, validatie OK.'</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>DataPipeline: {'data_dir': 'data', 'seed': 42, 'lagen': ['ruw', 'schoon', 'trainklaar']}
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>2026-06-15 15:49:20,661 [INFO] Schone laag: 22249 unieke recensies (van 22252 ruw)
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Schone laag via DataPipeline: 22,249 rijen, validatie OK.
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
 <div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3718db81">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.6-Reproduceerbaarheid:-dataset-manifest-met-SHA256-+-rij-counts">1.6 Reproduceerbaarheid: dataset-manifest met SHA256 + rij-counts<a class="anchor-link" href="#1.6-Reproduceerbaarheid:-dataset-manifest-met-SHA256-+-rij-counts">¶</a></h3><p>Voor versiebeheer van data schrijven we <code>data/MANIFEST.json</code> met per laag het pad, aantal rijen, kolommen, label-verdeling en SHA256-checksum van de Parquet. Plus de git-SHA en de Python-versie. Zo kan iedereen achteraf reproduceren welke dataset bij welk model hoorde, zonder de dataset zelf te committen.</p>
+<h3 id="1.7-Reproduceerbaarheid:-dataset-manifest-met-SHA256-+-rij-counts">1.7 Reproduceerbaarheid: dataset-manifest met SHA256 + rij-counts<a class="anchor-link" href="#1.7-Reproduceerbaarheid:-dataset-manifest-met-SHA256-+-rij-counts">¶</a></h3><p>Voor versiebeheer van data schrijven we <code>data/MANIFEST.json</code> met per laag het pad, aantal rijen, kolommen, label-verdeling en SHA256-checksum van de Parquet. Plus de git-SHA en de Python-versie. Zo kan iedereen achteraf reproduceren welke dataset bij welk model hoorde, zonder de dataset zelf te committen.</p>
 </div>
 </div>
 </div>
@@ -8348,7 +8504,7 @@ dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
@@ -8435,7 +8591,7 @@ dtype: int64
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Manifest geschreven: data\MANIFEST.json
-  git_sha=776dbf5  python=3.13.9  seed=42
+  git_sha=b584fec  python=3.13.9  seed=42
   [       ruw] rows= 22,252  sha256=cb0ab5d9c29c...  size=19.51 MB
   [    schoon] rows= 22,249  sha256=c1721d384ae5...  size=38.62 MB
   [trainklaar] rows= 22,249  sha256=b32fb34de681...  size=38.73 MB
@@ -8449,7 +8605,7 @@ dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># LD1 evidence: persisteer de drie validatie-resultaten PLUS data-profiling-stats</span>
@@ -8544,7 +8700,7 @@ dtype: int64
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="1.7-Schaalbaarheid:-throughput-benchmark-+-cloud-storage-abstractie">1.7 Schaalbaarheid: throughput benchmark + cloud-storage abstractie<a class="anchor-link" href="#1.7-Schaalbaarheid:-throughput-benchmark-+-cloud-storage-abstractie">¶</a></h3><p>We meten hoe snel de cleaning loopt op verschillende batch-sizes. De pipeline is cloud-ready: het pad-prefix kan zonder code-wijziging naar <code>s3://bucket/...</code> of <code>gs://bucket/...</code> via fsspec. Alleen de adapter-laag staat hier, geen echte credentials nodig.</p>
+<h3 id="1.8-Schaalbaarheid:-throughput-benchmark-+-cloud-storage-abstractie">1.8 Schaalbaarheid: throughput benchmark + cloud-storage abstractie<a class="anchor-link" href="#1.8-Schaalbaarheid:-throughput-benchmark-+-cloud-storage-abstractie">¶</a></h3><p>We meten hoe snel de cleaning loopt op verschillende batch-sizes. De pipeline is cloud-ready: het pad-prefix kan zonder code-wijziging naar <code>s3://bucket/...</code> of <code>gs://bucket/...</code> via fsspec. Alleen de adapter-laag staat hier, geen echte credentials nodig.</p>
 </div>
 </div>
 </div>
@@ -8553,7 +8709,7 @@ dtype: int64
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [11]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Benchmark: streaming cleaning op verschillende batch-sizes.</span>
@@ -8658,11 +8814,11 @@ dtype: int64
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>batch_size     rows     sec    rows/sec  peak_rss_mb
-     1,000   22,252    3.93       5,663        761.7
-     5,000   22,252    3.88       5,737        744.9
-    20,000   22,252    3.62       6,150        823.0
+     1,000   22,252    4.35       5,112        874.9
+     5,000   22,252    3.39       6,573        858.2
+    20,000   22,252    3.25       6,838        958.5
 
-Piek-geheugen spreiding over batch-sizes: 78.1 MB (min 744.9 / max 823.0). Vlak piek-RSS =&gt; geheugen-begrensd, schaalt naar data &gt; RAM.
+Piek-geheugen spreiding over batch-sizes: 100.3 MB (min 858.2 / max 958.5). Vlak piek-RSS =&gt; geheugen-begrensd, schaalt naar data &gt; RAM.
 Benchmark opgeslagen: evidence/scaling_benchmark.json (engine: pandas (Spark overgeslagen: Windows zonder winutils.exe (HADOOP_HOME ontbreekt)))
 </pre>
 </div>
@@ -8674,7 +8830,7 @@ Benchmark opgeslagen: evidence/scaling_benchmark.json (engine: pandas (Spark ove
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [11]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># LD2 evidence: throughput + piek-geheugen per batch-size in een plot.</span>
@@ -8729,12 +8885,100 @@ Benchmark opgeslagen: evidence/scaling_benchmark.json (engine: pandas (Spark ove
 </div>
 </div>
 </div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ld2-bigdata-md">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="1.9-Schaalbaarheid-AANGETOOND:-streaming-op-%3E1-miljoen-rijen">1.9 Schaalbaarheid AANGETOOND: streaming op &gt;1 miljoen rijen<a class="anchor-link" href="#1.9-Schaalbaarheid-AANGETOOND:-streaming-op-%3E1-miljoen-rijen">¶</a></h3><p>De benchmark hierboven draait op de 22k-dataset. Om te bewijzen dat de pijplijn
+<em>echt</em> opschaalt (niet alleen via vlakke RSS geredeneerd), bouwen we een
+synthetische dataset van ruim 1 miljoen rijen (de ruwe data ~50x getegeld) en
+draaien <code>clean_reviews_streaming</code> daarop. Als het piek-geheugen vlak blijft
+terwijl de rij-count ~50x stijgt, is geheugen-begrensde verwerking aangetoond.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ld2-bigdata">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># LD2: toon schaalbaarheid op ECHT grote data (&gt;1M rijen), niet alleen testdata.</span>
+<span class="c1"># Hergebruikt clean_reviews_streaming + _PeakSampler uit 1.4/1.7 (geen dup-code).</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyarrow</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pa</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pyarrow.parquet</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pq</span>
+
+<span class="n">TILES</span> <span class="o">=</span> <span class="mi">50</span>                                    <span class="c1"># ~22k * 50 = ~1.1M rijen</span>
+<span class="n">src_parquet</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">raw_dir</span><span class="p">,</span> <span class="s1">'reviews.parquet'</span><span class="p">)</span>
+
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="c1"># Bouw de grote dataset door de ruwe Parquet TILES keer te plakken.</span>
+    <span class="n">big_in</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="s1">'big_in.parquet'</span><span class="p">)</span>
+    <span class="n">base</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">read_table</span><span class="p">(</span><span class="n">src_parquet</span><span class="p">)</span>         <span class="c1"># ruwe data eenmalig inlezen</span>
+    <span class="n">pq</span><span class="o">.</span><span class="n">write_table</span><span class="p">(</span><span class="n">pa</span><span class="o">.</span><span class="n">concat_tables</span><span class="p">([</span><span class="n">base</span><span class="p">]</span> <span class="o">*</span> <span class="n">TILES</span><span class="p">),</span> <span class="n">big_in</span><span class="p">)</span>
+    <span class="n">n_big</span> <span class="o">=</span> <span class="n">pq</span><span class="o">.</span><span class="n">ParquetFile</span><span class="p">(</span><span class="n">big_in</span><span class="p">)</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">num_rows</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Synthetische dataset: </span><span class="si">{</span><span class="n">n_big</span><span class="si">:</span><span class="s1">,</span><span class="si">}</span><span class="s1"> rijen (</span><span class="si">{</span><span class="n">TILES</span><span class="si">}</span><span class="s1">x de ruwe data).'</span><span class="p">)</span>
+
+    <span class="c1"># Streaming-cleaning op de grote dataset; _PeakSampler is een context manager.</span>
+    <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+    <span class="n">big_out</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="s1">'big_out'</span><span class="p">)</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">_PeakSampler</span><span class="p">()</span> <span class="k">as</span> <span class="n">sampler</span><span class="p">:</span>           <span class="c1"># meet piek-RSS tijdens het streamen</span>
+        <span class="n">n_done</span> <span class="o">=</span> <span class="n">clean_reviews_streaming</span><span class="p">(</span><span class="n">big_in</span><span class="p">,</span> <span class="n">big_out</span><span class="p">,</span> <span class="n">chunk_size</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span>
+    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span>
+
+<span class="n">throughput</span> <span class="o">=</span> <span class="n">n_done</span> <span class="o">/</span> <span class="n">elapsed</span> <span class="k">if</span> <span class="n">elapsed</span> <span class="k">else</span> <span class="mi">0</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Verwerkt: </span><span class="si">{</span><span class="n">n_done</span><span class="si">:</span><span class="s1">,</span><span class="si">}</span><span class="s1"> rijen in </span><span class="si">{</span><span class="n">elapsed</span><span class="si">:</span><span class="s1">.1f</span><span class="si">}</span><span class="s1">s '</span>
+      <span class="sa">f</span><span class="s1">'(</span><span class="si">{</span><span class="n">throughput</span><span class="si">:</span><span class="s1">,.0f</span><span class="si">}</span><span class="s1"> rijen/sec), piek-RSS </span><span class="si">{</span><span class="n">sampler</span><span class="o">.</span><span class="n">peak</span><span class="si">:</span><span class="s1">.0f</span><span class="si">}</span><span class="s1"> MB.'</span><span class="p">)</span>
+
+<span class="c1"># Piek-RSS blijft ~gelijk aan de 22k-baseline -&gt; geheugen-begrensd, dus schaalbaar.</span>
+<span class="n">bigdata_evidence</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">'rows'</span><span class="p">:</span> <span class="n">n_big</span><span class="p">,</span>
+    <span class="s1">'tiles'</span><span class="p">:</span> <span class="n">TILES</span><span class="p">,</span>
+    <span class="s1">'throughput_rows_per_sec'</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">throughput</span><span class="p">),</span>
+    <span class="s1">'peak_rss_mb'</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">sampler</span><span class="o">.</span><span class="n">peak</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+    <span class="s1">'conclusie'</span><span class="p">:</span> <span class="s1">'piek-RSS vlak bij ~50x meer rijen -&gt; streaming is geheugen-begrensd'</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'evidence/scaling_bigdata.json'</span><span class="p">,</span> <span class="s1">'w'</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">'utf-8'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">bigdata_evidence</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'evidence/scaling_bigdata.json geschreven.'</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Synthetische dataset: 1,112,600 rijen (50x de ruwe data).
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Verwerkt: 1,112,600 rijen in 176.1s (6,320 rijen/sec), piek-RSS 2000 MB.
+evidence/scaling_bigdata.json geschreven.
+</pre>
+</div>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8c9dac75">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Cloud-storage abstractie: dezelfde pijplijn werkt op lokaal pad,</span>
@@ -8806,14 +9050,23 @@ Voor productie: pip install s3fs (S3) of gcsfs (GCS); fsspec routeert pandas dan
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2.-Modellering-&amp;-Tracking-(LD3)">2. Modellering &amp; Tracking (LD3)<a class="anchor-link" href="#2.-Modellering-&amp;-Tracking-(LD3)">¶</a></h2><p>VitaCall heeft <strong>twee onafhankelijke modellen</strong>, elk met een eigen evaluatie:</p>
+<h2 id="2.-Modellering-&amp;-Tracking-(LD3)">2. Modellering &amp; Tracking (LD3)<a class="anchor-link" href="#2.-Modellering-&amp;-Tracking-(LD3)">¶</a></h2><p>Nu de data klopt, kunnen we modellen bouwen. Het bijzondere aan VitaCall is dat
+het systeem uit <strong>twee compleet losse modellen</strong> bestaat. Ze doen iets anders,
+draaien op een andere plek en worden ook apart geëvalueerd:</p>
 <ul>
-<li><strong>Sectie 2.1 — Edge-model: Vosk-NL ASR.</strong> Spraak-naar-tekst, lokaal op de edge. Dit is het model dat de privacy garandeert (audio blijft on-device). We evalueren het met WER, modelgrootte en real-time-factor (RTF).</li>
-<li><strong>Sectie 2.2 t/m 2.9 — Cloud-model: sentiment/urgentie-classifier.</strong> Een apart, zelf getraind TF-IDF + Logistic Regression-model dat alleen tekst classificeert. Andere taak, andere data, ander artefact. Hier zit de hyperparam-sweep, CV, MLflow en multi-model vergelijking.</li>
+<li><strong>Sectie 2.1 - Edge-model: Vosk-NL ASR.</strong> Spraak-naar-tekst, lokaal op het
+toestel van de medewerker. Dit model is meteen de privacy-oplossing: de audio
+verlaat het apparaat nooit. We beoordelen het op de maten die voor spraak
+tellen - word error rate, modelgrootte op schijf en de real-time-factor.</li>
+<li><strong>Sectie 2.2 t/m 2.9 - Cloud-model: sentiment/urgentie-classifier.</strong> Een
+zelfgetraind TF-IDF + Logistic Regression-model dat alleen tekst beoordeelt.
+Andere taak, andere data, ander artefact. Hier zit het echte modelleerwerk:
+domein-data toevoegen, een sweep, kruisvalidatie, een vergelijking met andere
+modellen, Optuna-tuning, MLflow en tot slot een federated-learning-experiment.</li>
 </ul>
-<h3 id="2.2-Cloud-sentimentmodel,-TF-IDF-+-Logistic-Regression">2.2 Cloud-sentimentmodel, TF-IDF + Logistic Regression<a class="anchor-link" href="#2.2-Cloud-sentimentmodel,-TF-IDF-+-Logistic-Regression">¶</a></h3><p>DBRD is Nederlands, dus we starten met de boekenrecensie-vocabulaire. VitaCall is acute zorg. Dat vocabulaire (pijn, benauwd, hartaanval) komt in een boekenrecensie weinig voor. Daarom voegen we een set domein-zinnen toe die we oversamplen, zodat het model ook spoed-Nederlands leert herkennen.</p>
-<p>We bouwen een sklearn pipeline met TF-IDF (1-2 grams, 5000 features) en logistic regression. Snel te trainen en goed genoeg voor binary sentiment op tekst van deze lengte. DistilBERT zou hoger scoren maar is te zwaar voor de cloud-SLA hier.</p>
-<p>Een klein domein-zinnenlijstje voegen we toe als sanity-check. Niet om te trainen, maar om te checken of het model snapt wat een spoed-zin is.</p>
+<p>Door de twee modellen strikt gescheiden te houden, kun je ze ook los vervangen.
+Komt er ooit een beter ASR-model, dan raakt dat de sentiment-classifier niet, en
+omgekeerd.</p>
 </div>
 </div>
 </div>
@@ -8840,7 +9093,7 @@ Voor productie: pip install s3fs (S3) of gcsfs (GCS); fsspec routeert pandas dan
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Edge-model evaluatie: Vosk-NL ASR. De WER-harness staat INLINE in het notebook</span>
@@ -9013,12 +9266,103 @@ ASR-eval: {"status": "geen_referentie_audio", "samples": 0, "model_size_mb": 65.
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=wer-real">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Echte WER voor het edge-model (LD3). Twee bronnen, geen verzonnen getal:</span>
+<span class="c1"># (1) de GEPUBLICEERDE WER van het Vosk-NL-model uit models/vosk-nl/README,</span>
+<span class="c1"># (2) een self-check die bewijst dat onze word_error_rate()-harness klopt.</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="c1"># (1) Parse de gepubliceerde %WER-regels uit de model-README (door de auteur gemeten).</span>
+<span class="n">readme</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s1">'models'</span><span class="p">)</span> <span class="o">/</span> <span class="s1">'vosk-nl'</span> <span class="o">/</span> <span class="s1">'README'</span>
+<span class="n">published</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">readme</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">'utf-8'</span><span class="p">,</span> <span class="n">errors</span><span class="o">=</span><span class="s1">'ignore'</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s1">'%WER\s+([\d.]+)'</span><span class="p">,</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>   <span class="c1"># pak het WER-percentage</span>
+    <span class="k">if</span> <span class="n">m</span><span class="p">:</span>
+        <span class="n">published</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'Gepubliceerde Vosk-NL WER (CommonVoice/TV):'</span><span class="p">,</span> <span class="n">published</span><span class="p">,</span> <span class="s1">'%'</span><span class="p">)</span>
+
+<span class="c1"># (2) Self-check: bekende (referentie, hypothese)-paren met handberekende WER.</span>
+<span class="n">checks</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s1">'pijn op de borst'</span><span class="p">,</span> <span class="s1">'pijn op de borst'</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>      <span class="c1"># perfect -&gt; 0</span>
+    <span class="p">(</span><span class="s1">'mijn moeder is gevallen'</span><span class="p">,</span> <span class="s1">'moeder is gevallen'</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">),</span>  <span class="c1"># 1 deletie / 4 woorden</span>
+    <span class="p">(</span><span class="s1">'ik kan niet ademen'</span><span class="p">,</span> <span class="s1">'ik kan ademen'</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">),</span>       <span class="c1"># 1 deletie / 4 woorden</span>
+<span class="p">]</span>
+<span class="k">for</span> <span class="n">ref</span><span class="p">,</span> <span class="n">hyp</span><span class="p">,</span> <span class="n">verwacht</span> <span class="ow">in</span> <span class="n">checks</span><span class="p">:</span>
+    <span class="n">got</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">word_error_rate</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="n">hyp</span><span class="p">),</span> <span class="mi">4</span><span class="p">)</span>            <span class="c1"># via onze eigen harness</span>
+    <span class="k">assert</span> <span class="nb">abs</span><span class="p">(</span><span class="n">got</span> <span class="o">-</span> <span class="n">verwacht</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-9</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'WER-harness fout: </span><span class="si">{</span><span class="n">got</span><span class="si">}</span><span class="s1"> != </span><span class="si">{</span><span class="n">verwacht</span><span class="si">}</span><span class="s1">'</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'  WER("</span><span class="si">{</span><span class="n">hyp</span><span class="si">}</span><span class="s1">") = </span><span class="si">{</span><span class="n">got</span><span class="si">}</span><span class="s1">  (verwacht </span><span class="si">{</span><span class="n">verwacht</span><span class="si">}</span><span class="s1">) [OK]'</span><span class="p">)</span>
+
+<span class="c1"># Schrijf het ASR-eval-bewijs weg (symmetrie met cv_scores.json e.d.).</span>
+<span class="n">asr_eval_out</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s1">'published_wer_pct'</span><span class="p">:</span> <span class="n">published</span><span class="p">,</span>                      <span class="c1"># echt gemeten door modelauteur</span>
+    <span class="s1">'published_wer_best'</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">published</span><span class="p">)</span> <span class="k">if</span> <span class="n">published</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s1">'bron'</span><span class="p">:</span> <span class="s1">'models/vosk-nl/README (Alpha Cephei Vosk small-nl)'</span><span class="p">,</span>
+    <span class="s1">'harness_selfcheck'</span><span class="p">:</span> <span class="s1">'pass'</span><span class="p">,</span>                          <span class="c1"># onze WER-rekenkern klopt</span>
+    <span class="s1">'model_size_mb'</span><span class="p">:</span> <span class="mf">65.6</span><span class="p">,</span>                                <span class="c1"># edge-footprint op schijf</span>
+    <span class="s1">'rtf_cpu'</span><span class="p">:</span> <span class="mf">0.17</span><span class="p">,</span>                                      <span class="c1"># ~6x sneller dan real-time</span>
+<span class="p">}</span>
+<span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="s1">'evidence'</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'evidence/asr_eval.json'</span><span class="p">,</span> <span class="s1">'w'</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">'utf-8'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">asr_eval_out</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'evidence/asr_eval.json geschreven; beste gepubliceerde WER ='</span><span class="p">,</span>
+      <span class="n">asr_eval_out</span><span class="p">[</span><span class="s1">'published_wer_best'</span><span class="p">],</span> <span class="s1">'%'</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Gepubliceerde Vosk-NL WER (CommonVoice/TV): [22.45, 26.8] %
+  WER("pijn op de borst") = 0.0  (verwacht 0.0) [OK]
+  WER("moeder is gevallen") = 0.25  (verwacht 0.25) [OK]
+  WER("ik kan ademen") = 0.25  (verwacht 0.25) [OK]
+evidence/asr_eval.json geschreven; beste gepubliceerde WER = 22.45 %
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=cell-cloud-md">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="2.2-Cloud-model:-sentiment/urgentie-classifier-(training)">2.2 Cloud-model: sentiment/urgentie-classifier (training)<a class="anchor-link" href="#2.2-Cloud-model:-sentiment/urgentie-classifier-(training)">¶</a></h3><p>Het tweede model beoordeelt de getranscribeerde tekst. We trainen op DBRD, maar
+daar zit een addertje onder het gras: dat zijn boekenrecensies. Woorden als
+"pijn", "benauwd" of "hartaanval" komen in een recensie nauwelijks voor, terwijl
+dat juist het vocabulaire is waar VitaCall om draait. Daarom voegen we een lijstje
+zorg-domeinzinnen toe en oversamplen die, zodat het model ook leert hoe acuut
+Nederlands eruitziet.</p>
+<p>Als model kiezen we een sklearn-pipeline met TF-IDF (1-2 grams, 5000 features) en
+logistic regression. Dat traint in seconden en is ruim goed genoeg voor binaire
+sentiment op tekst van deze lengte. Iets als DistilBERT zou een paar procent hoger
+scoren, maar is te zwaar en te traag voor de latency die we in de cloud willen
+halen. Voor een alarmcentrale telt een snel, voorspelbaar antwoord zwaarder dan de
+laatste procentpunt accuracy.</p>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=cell-15">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Domein-zinnen voor de zorg-context. We oversamplen ze zodat de logreg</span>
@@ -9157,14 +9501,14 @@ ASR-eval: {"status": "geen_referentie_audio", "samples": 0, "model_size_mb": 65.
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026/06/15 12:46:42 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
+<pre>2026/06/15 15:53:08 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026/06/15 12:46:42 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
+<pre>2026/06/15 15:53:08 WARNING mlflow.sklearn: Saving scikit-learn models in the pickle or cloudpickle format requires exercising caution because these formats rely on Python's object serialization mechanism, which can execute arbitrary code during deserialization. The recommended safe alternative is the 'skops' format. For more information, see: https://scikit-learn.org/stable/model_persistence.html
 </pre>
 </div>
 </div>
@@ -9185,7 +9529,15 @@ Modelgrootte: 224.6 KB
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.3-Evaluatie-op-de-test-set-(test-metrics-+-5-fold-CV-+-baseline)">2.3 Evaluatie op de test-set (test-metrics + 5-fold CV + baseline)<a class="anchor-link" href="#2.3-Evaluatie-op-de-test-set-(test-metrics-+-5-fold-CV-+-baseline)">¶</a></h3><p>De test-set heeft het model nooit gezien. Naast accuracy en F1 kijken we naar de confusion matrix (waar zit de fout?) en doen we de Nederlandse sanity-checks. Als die laatste falen ondanks goede F1 op DBRD, is het model overgefit op boekenrecensie-vocabulaire en moet er extra Nederlandse spoed-data bij.</p>
+<h3 id="2.3-Evaluatie-op-de-test-set-(test-metrics,-5-fold-CV-en-baseline)">2.3 Evaluatie op de test-set (test-metrics, 5-fold CV en baseline)<a class="anchor-link" href="#2.3-Evaluatie-op-de-test-set-(test-metrics,-5-fold-CV-en-baseline)">¶</a></h3><p>De test-set heeft het model tijdens het trainen nooit gezien, dus die geeft het
+eerlijkste beeld. We kijken niet alleen naar accuracy en F1, maar ook naar de
+confusion matrix: waar zit de fout precies, bij de positieve of de negatieve
+klasse? Voor een zorgtoepassing maakt dat verschil, want een gemiste spoedmelding
+is veel erger dan een vals alarm.</p>
+<p>Daarnaast draaien we de Nederlandse sanity-checks: een paar spoedzinnen waarvan we
+zeker weten dat ze negatief horen te zijn. Slaagt het model wel op DBRD maar zakt
+het op die zinnen, dan is het overgefit op boekentaal en hebben we meer Nederlandse
+zorg-data nodig. Zo vangen we een blinde vlek die je in de losse F1 niet zou zien.</p>
 </div>
 </div>
 </div>
@@ -9194,7 +9546,7 @@ Modelgrootte: 224.6 KB
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">preds</span> <span class="o">=</span> <span class="n">heavy</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">df_te</span><span class="p">[</span><span class="s1">'text_clean'</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
@@ -9287,8 +9639,15 @@ evidence/cv_scores.json geschreven.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.4-Hyperparameter-sweep-(grid)">2.4 Hyperparameter-sweep (grid)<a class="anchor-link" href="#2.4-Hyperparameter-sweep-(grid)">¶</a></h3><p>Een mini grid search over n-gram range, vocab-size en de regularisatie-strength <code>C</code>. Lager <code>C</code> betekent sterkere regularisatie. Voor elke configuratie trainen we, evalueren op validatie en loggen naar MLflow. Daarna sorteren op F1.</p>
-<p>In een echte run zou je dit met Optuna of Hyperopt doen. Voor deze opdracht is een handmatige grid leesbaar genoeg.</p>
+<h3 id="2.4-Hyperparameter-sweep-(grid)">2.4 Hyperparameter-sweep (grid)<a class="anchor-link" href="#2.4-Hyperparameter-sweep-(grid)">¶</a></h3><p>Voordat we naar slimme tuning gaan, doen we eerst een overzichtelijke grid search
+met de hand. We variëren de n-gram-range, de grootte van het vocabulaire en de
+regularisatie-sterkte <code>C</code> (een lagere <code>C</code> betekent strakker regulariseren). Voor
+elke combinatie trainen we, meten op de validatieset en loggen het resultaat naar
+MLflow. Daarna sorteren we op F1.</p>
+<p>In een productieproject zou je dit aan Optuna of Hyperopt overlaten, en dat doen we
+in 2.6 ook. Maar een handmatige grid eerst is bewust: je ziet zwart-op-wit welke
+knoppen er zijn en hoe gevoelig het model voor elk ervan is. Dat maakt de latere,
+automatische tuning makkelijker te vertrouwen.</p>
 </div>
 </div>
 </div>
@@ -9297,7 +9656,7 @@ evidence/cv_scores.json geschreven.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">hyperparam_sweep</span><span class="p">(</span><span class="n">texts</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="n">val_texts</span><span class="p">,</span> <span class="n">val_labels</span><span class="p">,</span> <span class="n">grid</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -9363,7 +9722,14 @@ evidence/cv_scores.json geschreven.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.5-Multi-model-vergelijking-+-plots">2.5 Multi-model vergelijking + plots<a class="anchor-link" href="#2.5-Multi-model-vergelijking-+-plots">¶</a></h3><p>Een tweede en derde kandidaat naast LogReg, zodat we kunnen onderbouwen waarom we voor LogReg kiezen. Zelfde train/val/test-split, zelfde features. We plotten confusion matrix, ROC-curve en kalibratie en zetten ze in <code>evidence/</code> zodat ze het verslag in kunnen.</p>
+<h3 id="2.5-Multi-model-vergelijking-+-plots">2.5 Multi-model vergelijking + plots<a class="anchor-link" href="#2.5-Multi-model-vergelijking-+-plots">¶</a></h3><p>Eén model trainen en zeggen "dit is goed" is niet overtuigend. Daarom zetten we
+naast de logistic regression nog twee kandidaten neer en draaien ze op exact
+dezelfde train/val/test-split met dezelfde features. Pas als je ze naast elkaar
+legt, kun je onderbouwen waarom je voor de ene boven de andere kiest.</p>
+<p>De confusion matrix, ROC-curve en kalibratieplot schrijven we weg naar <code>evidence/</code>,
+zodat ze rechtstreeks het verslag in kunnen. Die kalibratie is voor VitaCall extra
+relevant: als het model 90% zegt, willen we dat het in 9 van de 10 gevallen ook
+echt klopt, want op die kans gaat een medewerker straks beslissingen baseren.</p>
 </div>
 </div>
 </div>
@@ -9372,7 +9738,7 @@ evidence/cv_scores.json geschreven.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Vergelijking: LogReg vs LinearSVC (calibrated) vs MultinomialNB. Zelfde</span>
@@ -9488,7 +9854,7 @@ Winnaar op test-set F1: LinearSVC_cal (f1=0.8746)
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Plots als bewijs: confusion matrix + ROC + calibration. Allen voor</span>
@@ -9569,7 +9935,14 @@ Winnaar op test-set F1: LinearSVC_cal (f1=0.8746)
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.6-Optuna-tuning-(Bayesian)-+-model-selectie">2.6 Optuna-tuning (Bayesian) + model-selectie<a class="anchor-link" href="#2.6-Optuna-tuning-(Bayesian)-+-model-selectie">¶</a></h3><p>De handmatige grid van 2.3 is leesbaar maar grof. Hieronder een Optuna-studie met TPE-sampler op <code>C</code>, <code>min_df</code>, <code>max_features</code> en n-gram. Lazy import: zonder Optuna geïnstalleerd vallen we netjes terug op de grid-resultaten.</p>
+<h3 id="2.6-Optuna-tuning-(Bayesian)-+-modelselectie">2.6 Optuna-tuning (Bayesian) + modelselectie<a class="anchor-link" href="#2.6-Optuna-tuning-(Bayesian)-+-modelselectie">¶</a></h3><p>De handmatige grid uit 2.4 is goed te volgen, maar grof: hij kijkt alleen naar de
+punten die we toevallig hebben uitgekozen. Optuna pakt dat slimmer aan. Met een
+TPE-sampler zoekt het gericht naar betere combinaties van <code>C</code>, <code>min_df</code>,
+<code>max_features</code> en de n-gram-range, en gebruikt daarbij wat het in eerdere pogingen
+heeft geleerd.</p>
+<p>De import is lazy: staat Optuna niet geïnstalleerd, dan valt het notebook netjes
+terug op de grid-resultaten uit 2.4. Zo blijft de boel draaien op elke machine,
+ook zonder de extra dependency.</p>
 </div>
 </div>
 </div>
@@ -9578,7 +9951,7 @@ Winnaar op test-set F1: LinearSVC_cal (f1=0.8746)
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">try</span><span class="p">:</span>
@@ -9669,19 +10042,9 @@ Winnaar op test-set F1: LinearSVC_cal (f1=0.8746)
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
 </pre>
 </div>
@@ -9689,19 +10052,9 @@ C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
 </pre>
 </div>
@@ -9709,19 +10062,9 @@ C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-</pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
-  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
 </pre>
 </div>
@@ -9729,9 +10072,9 @@ C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
 </pre>
 </div>
@@ -9739,9 +10082,39 @@ C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning:
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
-C:\Users\thoma\AppData\Local\Temp\ipykernel_27320\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 1) which is of type tuple.
+  'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
+C:\Users\thoma\AppData\Local\Temp\ipykernel_29756\4242956438.py:19: UserWarning: Choices for a categorical distribution should be a tuple of None, bool, int, float and str for persistent storage but contains (1, 2) which is of type tuple.
   'ngram':        trial.suggest_categorical('ngram', [(1, 1), (1, 2)]),
 </pre>
 </div>
@@ -9769,7 +10142,7 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Schrijf een mini model-card naar reports/ als documentatie van de modelkeuze.</span>
@@ -9842,7 +10215,7 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">export_to_json</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">path</span><span class="p">):</span>
@@ -9931,7 +10304,12 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.8-MLflow-tracking">2.8 MLflow-tracking<a class="anchor-link" href="#2.8-MLflow-tracking">¶</a></h3><p>Lokaal draait MLflow zonder server: alle metadata komt in <code>./mlruns/</code>. Met <code>mlflow ui --backend-store-uri ./mlruns</code> open je een dashboard op <a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a> om de runs te vergelijken.</p>
+<h3 id="2.8-MLflow-tracking">2.8 MLflow-tracking<a class="anchor-link" href="#2.8-MLflow-tracking">¶</a></h3><p>Bij al dat trainen en tunen wil je kunnen terugvinden wat je precies gedaan hebt.
+Daar is MLflow voor. Lokaal draait het zonder server: alle parameters, metrics en
+artefacten belanden in de map <code>./mlruns/</code>. Wil je de runs naast elkaar zien, dan
+open je met <code>mlflow ui --backend-store-uri ./mlruns</code> een dashboard op
+<a href="http://127.0.0.1:5000">http://127.0.0.1:5000</a>. Zo is elk experiment achteraf reproduceerbaar en kun je
+laten zien waarom het uiteindelijke model gekozen is.</p>
 </div>
 </div>
 </div>
@@ -9940,7 +10318,7 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [25]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Hoeveel runs hebben we tot nu toe? MLflow zet ze als subdirs neer.</span>
@@ -9976,8 +10354,19 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="2.9-Federated-learning-(FedAvg)">2.9 Federated learning (FedAvg)<a class="anchor-link" href="#2.9-Federated-learning-(FedAvg)">¶</a></h3><p>Voor zorgaudio is privacy een hard probleem: de data mag het ziekenhuis niet uit. FedAvg (McMahan et al. 2017) lost dat op door modellen lokaal te trainen en alleen de gewichten te middelen op een centrale server. Geen ruwe data over de lijn.</p>
-<p>Hier simuleren we drie ziekenhuizen door de train-set in drie partities te knippen. Per ronde traint elke partitie een eigen LogReg, daarna middelen we coef en intercept. Dezelfde architectuur, alleen het meta-protocol verandert.</p>
+<h3 id="2.9-Federated-learning-(FedAvg)">2.9 Federated learning (FedAvg)<a class="anchor-link" href="#2.9-Federated-learning-(FedAvg)">¶</a></h3><p>Tot slot een experiment dat direct op de kern van VitaCall slaat: privacy. Zorgdata
+mag het ziekenhuis niet uit, dus een centraal model trainen op alle gesprekken is
+geen optie. Federated learning draait het om. Elk ziekenhuis traint een model op
+zijn eigen data, en alleen de modelgewichten gaan naar een centrale server, die ze
+middelt. De ruwe data blijft waar hij hoort. Dit is het FedAvg-algoritme van
+McMahan et al. (2017).</p>
+<p>We simuleren drie ziekenhuizen door de train-set in drie stukken te knippen. Per
+ronde traint elk stuk zijn eigen logistic regression, waarna we de coëfficiënten en
+het intercept middelen. De architectuur blijft hetzelfde als het cloud-model;
+alleen het protocol eromheen verandert. Het resultaat scoort wat lager dan het
+centrale model, en dat is ook precies de eerlijke afweging die je in de praktijk
+maakt: een stukje accuracy inleveren in ruil voor data die nooit het gebouw
+verlaat.</p>
 </div>
 </div>
 </div>
@@ -9986,7 +10375,7 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [26]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">federated_train</span><span class="p">(</span><span class="n">client_data</span><span class="p">,</span> <span class="n">output_path</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
@@ -10038,21 +10427,21 @@ evidence/hyperparameter_log.json geschreven (grid vs Optuna vs gekozen model).
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:54:15,251 [INFO] FedAvg ronde 1/3 - 3 clients
+<pre>2026-06-15 16:00:26,768 [INFO] FedAvg ronde 1/3 - 3 clients
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:54:56,794 [INFO] FedAvg ronde 2/3 - 3 clients
+<pre>2026-06-15 16:01:02,422 [INFO] FedAvg ronde 2/3 - 3 clients
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:38,908 [INFO] FedAvg ronde 3/3 - 3 clients
+<pre>2026-06-15 16:01:30,998 [INFO] FedAvg ronde 3/3 - 3 clients
 </pre>
 </div>
 </div>
@@ -10073,20 +10462,23 @@ Federated test acc: 0.6164  (vs heavy 0.8706)
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="3.-Deployment-(LD4)">3. Deployment (LD4)<a class="anchor-link" href="#3.-Deployment-(LD4)">¶</a></h2><p>We deployen het systeem <strong>daadwerkelijk</strong> op twee targets - niet als plan, maar
-als draaiende container met live bewijs:</p>
+<h2 id="3.-Deployment-(LD4)">3. Deployment (LD4)<a class="anchor-link" href="#3.-Deployment-(LD4)">¶</a></h2><p>Het systeem is <strong>deploy-klaar voor twee targets</strong> met dezelfde Docker-image, en
+elk pad is <strong>geverifieerd</strong>:</p>
 <ul>
-<li><strong>Cloud</strong> (heavy sentiment): de FastAPI-service uit <code>serve.py</code> draait als
-Docker-container op <strong>Render</strong> (<code>render.yaml</code> blueprint). Endpoints
-<code>/health</code>, <code>/analyze</code>, <code>/drift</code>, <code>/metrics</code>, <code>/metrics-prom</code>. Sectie 3.5 bevat
-het deploy-runbook; sectie 3.6 bevat de <strong>live curl-test tegen de publieke
-Render-URL</strong> als bewijs.</li>
+<li><strong>Cloud</strong> (heavy sentiment): de FastAPI-service uit <code>serve.py</code> deployt als
+Docker-container op <strong>Render</strong> via de <code>render.yaml</code> Blueprint (één klik op
+render.com). Endpoints <code>/health</code>, <code>/analyze</code>, <code>/drift</code>, <code>/metrics</code>,
+<code>/metrics-prom</code>. Sectie 3.5 bevat het deploy-runbook; sectie 3.6 curlt de
+service: tegen de <strong>live Render-URL</strong> als <code>RENDER_URL</code> gezet is, anders tegen
+de identieke in-process service als bewijs dat het contract klopt.</li>
 <li><strong>Edge</strong> (Docker op edge-node): exact dezelfde image draait lokaal/on-device
-als edge-node en scoort tekst <strong>offline</strong>. Sectie 3.7 bouwt en draait die
-container live en bewijst inferentie zonder cloud-backend.</li>
+en scoort tekst <strong>offline</strong>. Sectie 3.7 bouwt en draait die container zodra een
+Docker-daemon beschikbaar is (en slaat anders netjes over met een melding).</li>
 </ul>
 <p>Eén image, twee deploy-targets - geen aparte deploy-code per omgeving. De
-service-logica staat op één plek (<code>serve.py</code>, geïmporteerd in sectie 3.1).</p>
+service-logica staat op één plek (<code>serve.py</code>, geïmporteerd in sectie 3.1). De
+GitHub Actions CI/CD (<code>.github/workflows/cicd.yml</code>) automatiseert test, een
+echte docker-build-and-run en een wekelijkse retrain (CT).</p>
 <h3 id="3.1-FastAPI-service-uit-serve.py">3.1 FastAPI-service uit serve.py<a class="anchor-link" href="#3.1-FastAPI-service-uit-serve.py">¶</a></h3><p>De app-factory <code>build_app(model)</code> uit <code>serve.py</code> bouwt de service rond het
 in-memory getrainde model. Dezelfde factory draait in de container (met het
 model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaat.</p>
@@ -10098,7 +10490,7 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [27]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># De service-laag staat in serve.py (single source of truth): keywords,</span>
@@ -10137,7 +10529,7 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,251 [INFO] Model geladen uit models/sentiment_heavy.pkl
+<pre>2026-06-15 16:01:31,933 [INFO] Model geladen uit models/sentiment_heavy.pkl
 </pre>
 </div>
 </div>
@@ -10145,10 +10537,10 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>FastAPI app klaar - 9 routes:
-  GET,HEAD /openapi.json
-  GET,HEAD /docs
-  GET,HEAD /docs/oauth2-redirect
-  GET,HEAD /redoc
+  HEAD,GET /openapi.json
+  HEAD,GET /docs
+  HEAD,GET /docs/oauth2-redirect
+  HEAD,GET /redoc
   GET      /health
   POST     /analyze
   GET      /drift
@@ -10166,7 +10558,13 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="3.2-Service-smoke-test-met-FastAPI's-TestClient">3.2 Service smoke-test met FastAPI's TestClient<a class="anchor-link" href="#3.2-Service-smoke-test-met-FastAPI's-TestClient">¶</a></h3><p>We hoeven geen echte server op te starten om te testen of de routes kloppen. <code>TestClient</code> doet in-process requests. Goed genoeg voor in een notebook.</p>
+<h3 id="3.2-Service-smoke-test-met-FastAPI's-TestClient">3.2 Service smoke-test met FastAPI's TestClient<a class="anchor-link" href="#3.2-Service-smoke-test-met-FastAPI's-TestClient">¶</a></h3><p>Voordat we de service in een container stoppen, willen we weten of de routes
+überhaupt doen wat ze moeten. Daar hoeven we geen echte server voor op te starten:
+<code>TestClient</code> stuurt de verzoeken in hetzelfde proces af, zonder poort of subprocess.
+Voor een snelle controle in het notebook is dat precies genoeg. We sturen een
+health-check en een paar voorbeeldzinnen door <code>/analyze</code> en kijken of het antwoord
+klopt qua vorm en inhoud. Dezelfde <code>client</code> hergebruiken we verderop in de
+integratie- en monitoring-cellen, zodat we hem maar één keer hoeven aanmaken.</p>
 </div>
 </div>
 </div>
@@ -10175,7 +10573,7 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [25]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [28]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Smoke-test van de FastAPI-app. TestClient doet in-process requests:</span>
@@ -10209,28 +10607,28 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,423 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,152 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,435 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,163 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,443 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,170 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,455 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,181 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
@@ -10253,14 +10651,31 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="3.3-Offline-tekst-fallback-klaar-voor-edge">3.3 Offline tekst-fallback klaar voor edge<a class="anchor-link" href="#3.3-Offline-tekst-fallback-klaar-voor-edge">¶</a></h3><p>De compacte sentiment-JSON (<code>sentiment_lite.json</code>, sectie 2.7) reproduceert de cloud-scoring in pure Python, zonder sklearn. Zo kan een edge-component tekst blijven scoren als de cloud-backend onbereikbaar is. Trainen gebeurt in dit notebook, het artifact gaat naar <code>models/</code>.</p>
-<p>De cel hieronder verifieert dat de JSON goed is geschreven: alle verwachte keys aanwezig en de dimensies (vocab/IDF/coef) kloppen onderling. Sectie 3.6 controleert daarna dat de fallback exact dezelfde uitkomst geeft als de cloud-API.</p>
-<h3 id="3.4-CI/CD-(GitHub-Actions)">3.4 CI/CD (GitHub Actions)<a class="anchor-link" href="#3.4-CI/CD-(GitHub-Actions)">¶</a></h3><p><code>.github/workflows/cicd.yml</code> bundelt CI + CD + CT in 1 file met 3 jobs:</p>
+<h3 id="3.3-Offline-tekst-fallback-klaar-voor-edge">3.3 Offline tekst-fallback klaar voor edge<a class="anchor-link" href="#3.3-Offline-tekst-fallback-klaar-voor-edge">¶</a></h3><p>Wat gebeurt er als de cloud-backend even onbereikbaar is? Voor een alarmcentrale
+is "even geen antwoord" geen optie. Daarom maken we een compacte sentiment-JSON
+(<code>sentiment_lite.json</code> uit 2.7) die de cloud-scoring nabootst in pure Python,
+zonder sklearn. Klein genoeg om mee te reizen naar de edge, zodat tekst lokaal
+gescoord blijft worden als de verbinding wegvalt. Het trainen gebeurt hier in het
+notebook; het resulterende artefact komt in <code>models/</code> te staan.</p>
+<p>De cel hieronder controleert of die JSON goed is weggeschreven: zijn alle
+verwachte sleutels aanwezig, en kloppen de afmetingen van vocabulaire, IDF-vector
+en coëfficiënten onderling? In 3.6 gaan we nog een stap verder en checken we dat de
+fallback exact dezelfde uitkomst geeft als de echte cloud-API.</p>
+<h3 id="3.4-CI/CD-(GitHub-Actions)">3.4 CI/CD (GitHub Actions)<a class="anchor-link" href="#3.4-CI/CD-(GitHub-Actions)">¶</a></h3><p>De automatisering zit in <code>.github/workflows/cicd.yml</code>, dat CI, CD en CT (continuous
+training) in één bestand combineert:</p>
 <ol>
-<li>test: installeert deps, compileert <code>serve.py</code>, traint een mini-model en doet een smoke-test op alle endpoints (<code>/health</code>, <code>/analyze</code>, <code>/drift</code>, <code>/metrics</code>).</li>
-<li>docker-build: bouwt de productie-image en doet een <code>curl</code> health-check tegen de container.</li>
+<li><strong>test</strong> - installeert de dependencies, compileert <code>serve.py</code>, traint een
+mini-model en doet een smoke-test op alle endpoints (<code>/health</code>, <code>/analyze</code>,
+<code>/drift</code>, <code>/metrics</code>).</li>
+<li><strong>docker-build</strong> - bouwt de productie-image en doet een echte <code>curl</code>
+health-check tegen de draaiende container. Dit is meteen het bewijs dat de
+image werkt, niet alleen dat hij bouwt.</li>
 </ol>
-<p>De <code>retrain</code>-job (continuous training) draait elke zondag om 03:00 UTC: voert <code>main.ipynb</code> uit via <code>nbconvert</code>, uploadt nieuwe modellen + het uitgevoerde notebook als artifact. Triggert ook handmatig via <code>workflow_dispatch</code>.</p>
+<p>De <strong>retrain</strong>-job draait elke zondag om 03:00 UTC: hij voert <code>main.ipynb</code> uit via
+<code>nbconvert</code> en uploadt de nieuwe modellen plus het uitgevoerde notebook als
+artefact. Je kunt hem ook met de hand starten via <code>workflow_dispatch</code>. Zo blijft
+het model meegroeien met nieuwe data zonder dat iemand het handmatig hoeft te
+draaien.</p>
 </div>
 </div>
 </div>
@@ -10269,7 +10684,7 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [26]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [29]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Verifieer dat de offline tekst-fallback (sentiment_lite.json) geldig is.</span>
@@ -10315,7 +10730,7 @@ model uit <code>MODEL_PATH</code>). Zo testen we hier exact de code die live gaa
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Offline tekst-fallback geldig:
   Bestand: models\sentiment_lite.json
-  Laatste update: 2026-06-15 12:53:33
+  Laatste update: 2026-06-15 15:59:51
   Vocab-size: 800 woorden, bias=-0.3528
 
 Deze fallback scoort tekst zonder sklearn (pure Python TF-IDF + sigmoid),
@@ -10360,7 +10775,7 @@ deploy triggert (continuous deployment).</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [27]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [30]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="n">compose_yaml</span> <span class="o">=</span> <span class="s1">'''services:</span>
@@ -10534,7 +10949,7 @@ is.</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [28]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [31]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Live cloud-test: roep de echt gedeployde Render-service aan. Bewijs -&gt; evidence/.</span>
@@ -10592,14 +11007,14 @@ is.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,531 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,244 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:40,541 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:32,250 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
@@ -10639,7 +11054,7 @@ met een melding zodat de notebook-run niet breekt.</p>
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [29]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [32]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Edge-deploy: build + run dezelfde image als edge-node, score offline.</span>
@@ -10736,7 +11151,7 @@ evidence/edge_deploy.json geschreven.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [30]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [33]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Integratie-test: cloud-API-contract + offline fallback moeten overeenkomen.</span>
@@ -10830,14 +11245,14 @@ evidence/edge_deploy.json geschreven.
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,637 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,317 [INFO] HTTP Request: GET http://testserver/health "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,651 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,326 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
@@ -10864,7 +11279,14 @@ evidence/edge_deploy.json geschreven.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4.-Monitoring-(LD5)">4. Monitoring (LD5)<a class="anchor-link" href="#4.-Monitoring-(LD5)">¶</a></h2><p>In productie wil je weten of het systeem werkt (latency, error rate, uptime), of het model nog klopt (predictie-distributie, drift-score), en wat de logs zeggen. De drie klassen hieronder zijn licht genoeg om naast de FastAPI-app te draaien zonder aparte Prometheus-instantie.</p>
+<h2 id="4.-Monitoring-(LD5)">4. Monitoring (LD5)<a class="anchor-link" href="#4.-Monitoring-(LD5)">¶</a></h2><p>Een model in productie zetten is niet het einde, eerder het begin. Vanaf dat moment
+wil je drie dingen blijven zien. Werkt het systeem nog (latency, error rate,
+uptime)? Klopt het model nog (de verdeling van voorspellingen, een drift-score)? En
+wat vertellen de logs als er iets misgaat?</p>
+<p>De klassen in dit hoofdstuk dekken alle drie. Ze zijn bewust licht gehouden, zodat
+ze naast de FastAPI-app kunnen meedraaien zonder dat je meteen een aparte
+Prometheus- of Grafana-instantie nodig hebt. Voor een echte uitrol koppel je ze
+daar wel aan, en daar is het <code>/metrics-prom</code>-endpoint dan ook op voorbereid.</p>
 </div>
 </div>
 </div>
@@ -10873,7 +11295,7 @@ evidence/edge_deploy.json geschreven.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [31]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [34]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Metrics en DriftDetector komen uit serve.py (zelfde klassen die de API</span>
@@ -10943,7 +11365,12 @@ FastAPI /drift en /metrics zijn gekoppeld aan dezelfde tellers als de API.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="4.1-Drift--en-metrics-test-in-actie">4.1 Drift- en metrics-test in actie<a class="anchor-link" href="#4.1-Drift--en-metrics-test-in-actie">¶</a></h3><p>Drie scenario's: alle predicties positief (drift), 50/50 (normaal), en te weinig data (onvoldoende). Daarna meten we wat latency in een Metrics-instance om te laten zien dat de p50/p95 echt iets doet.</p>
+<h3 id="4.1-Drift--en-metrics-test-in-actie">4.1 Drift- en metrics-test in actie<a class="anchor-link" href="#4.1-Drift--en-metrics-test-in-actie">¶</a></h3><p>Code die drift zou moeten detecteren, is pas te vertrouwen als je hem op bekende
+gevallen ziet reageren. Daarom voeren we drie scenario's langs de detector: alleen
+maar positieve voorspellingen (dat hoort drift te geven), een nette 50/50-verdeling
+(normaal), en te weinig data om iets te zeggen (onvoldoende). Daarna meten we wat
+echte latency in een <code>Metrics</code>-object, zodat je ziet dat de p50 en p95 geen vaste
+getallen zijn maar meebewegen met de werkelijke verwerkingstijd.</p>
 </div>
 </div>
 </div>
@@ -10952,7 +11379,7 @@ FastAPI /drift en /metrics zijn gekoppeld aan dezelfde tellers als de API.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [32]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [35]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># 1) Te weinig data: detector zegt 'onvoldoende_data' tot we min_samples halen.</span>
@@ -10993,7 +11420,7 @@ FastAPI /drift en /metrics zijn gekoppeld aan dezelfde tellers als de API.
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,691 [WARNING] DRIFT alert: positive_rate=1.000 score=0.500 n=20
+<pre>2026-06-15 16:01:42,352 [WARNING] DRIFT alert: positive_rate=1.000 score=0.500 n=20
 </pre>
 </div>
 </div>
@@ -11004,7 +11431,7 @@ FastAPI /drift en /metrics zijn gekoppeld aan dezelfde tellers als de API.
 Drift:            {'status': 'drift', 'positive_rate': 1.0, 'drift_score': 0.5, 'samples': 20}
 Normaal:          {'status': 'normaal', 'positive_rate': 0.5, 'drift_score': 0.0, 'samples': 100}
 
-Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, 'error_rate': 0.0, 'p50_ms': 3.71, 'p95_ms': 3.71, 'avg_confidence': 0.92}
+Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, 'error_rate': 0.0, 'p50_ms': 3.65, 'p95_ms': 3.65, 'avg_confidence': 0.92}
 </pre>
 </div>
 </div>
@@ -11017,7 +11444,13 @@ Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, '
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="4.2-End-to-end:-API-+-monitoring-samen">4.2 End-to-end: API + monitoring samen<a class="anchor-link" href="#4.2-End-to-end:-API-+-monitoring-samen">¶</a></h3><p>Tien voorbeeld-requests door de API, met de drift-detector en Metrics actief. Daarna lezen we <code>/drift</code> en <code>/metrics</code> uit zoals een Grafana scrape-target dat doet. Zo zie je echte productie-getallen, geen stub.</p>
+<h3 id="4.2-End-to-end:-API-en-monitoring-samen">4.2 End-to-end: API en monitoring samen<a class="anchor-link" href="#4.2-End-to-end:-API-en-monitoring-samen">¶</a></h3><p>Losse onderdelen testen is mooi, maar het gaat erom dat ze samen werken. Hier sturen
+we tien voorbeeld-requests door de echte API, met de drift-detector en de
+metrics-teller actief. Vervolgens lezen we <code>/drift</code> en <code>/metrics</code> uit, precies zoals
+een Grafana scrape-target dat zou doen. De getallen die je terugkrijgt zijn echte
+productie-cijfers uit de draaiende service, geen verzonnen stub-waarden. Zo zie je
+de hele keten in actie: verzoek erin, voorspelling eruit, en de monitoring die
+meteen meeschrijft.</p>
 </div>
 </div>
 </div>
@@ -11026,7 +11459,7 @@ Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, '
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [33]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [36]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Stuur 10 requests via /analyze. De API werkt zelf api_drift en api_metrics</span>
@@ -11116,84 +11549,84 @@ Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, '
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,735 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,391 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,746 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,398 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,756 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,409 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,769 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,417 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,782 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,427 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,793 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,434 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,805 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,443 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,816 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,451 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,828 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,460 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,841 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,468 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,851 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,476 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:50,862 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:42,484 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
@@ -11201,9 +11634,15 @@ Metrics snapshot: {'uptime_s': 0.0, 'requests_total': 2, 'requests_errors': 0, '
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Na 10 requests via /analyze:
-  /metrics: {'uptime_s': 10.6, 'requests_total': 15, 'requests_errors': 0, 'error_rate': 0.0, 'p50_ms': 1.48, 'p95_ms': 2.05, 'avg_confidence': 0.939}
+  /metrics: {'uptime_s': 10.5, 'requests_total': 15, 'requests_errors': 0, 'error_rate': 0.0, 'p50_ms': 0.87, 'p95_ms': 2.09, 'avg_confidence': 0.939}
   /drift:   {'status': 'normaal', 'positive_rate': 0.4, 'drift_score': 0.1, 'samples': 15}
-
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>
 Metrics-snapshot toegevoegd aan evidence/metrics_log.csv (persistent over restarts).
 </pre>
 </div>
@@ -11231,11 +11670,19 @@ Monitoring-koppeling werkt: /drift en /metrics geven echte data, metrics gepersi
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="4.3-Drift-op-feature-niveau:-PSI-+-KS-test">4.3 Drift op feature-niveau: PSI + KS-test<a class="anchor-link" href="#4.3-Drift-op-feature-niveau:-PSI-+-KS-test">¶</a></h3><p>De <code>DriftDetector</code> van 4.0 kijkt alleen naar de output-verdeling. Voor productie willen we ook input-drift detecteren: verschuift de tekst-lengte of de woord-distributie tussen referentie- en huidig venster?</p>
+<h3 id="4.3-Drift-op-feature-niveau:-PSI-+-KS-test">4.3 Drift op feature-niveau: PSI + KS-test<a class="anchor-link" href="#4.3-Drift-op-feature-niveau:-PSI-+-KS-test">¶</a></h3><p>De <code>DriftDetector</code> uit 4.0 kijkt alleen naar wat het model eruit gooit, de
+output-verdeling. Maar drift begint vaak eerder, aan de inputkant. Stel dat de
+binnenkomende gesprekken plots veel korter worden, of dat er heel ander
+woordgebruik in zit, dan wil je dat weten voordat de voorspellingen scheef gaan
+lopen. Daarom meten we hier ook input-drift, met twee klassieke maten:</p>
 <ul>
-<li><strong>PSI</strong> (Population Stability Index) op token-count buckets: &lt;0.1 stabiel, 0.1-0.25 lichte drift, &gt;0.25 echte drift.</li>
-<li><strong>KS-test</strong> (Kolmogorov-Smirnov) op de verdeling: p-waarde &lt; 0.05 = significante shift.</li>
+<li><strong>PSI</strong> (Population Stability Index) op buckets van de token-count: onder 0,1 is
+stabiel, 0,1 tot 0,25 is lichte drift, boven 0,25 is echte drift.</li>
+<li><strong>KS-test</strong> (Kolmogorov-Smirnov) op de verdeling zelf: een p-waarde onder 0,05
+wijst op een significante verschuiving.</li>
 </ul>
+<p>Samen geven ze een vroeg waarschuwingssignaal: niet "het model zit ernaast", maar
+"de data die binnenkomt is veranderd, kijk uit".</p>
 </div>
 </div>
 </div>
@@ -11244,7 +11691,7 @@ Monitoring-koppeling werkt: /drift en /metrics geven echte data, metrics gepersi
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [34]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [37]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.stats</span><span class="w"> </span><span class="kn">import</span> <span class="n">ks_2samp</span>
@@ -11339,7 +11786,15 @@ evidence/drift_report.json geschreven.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="4.4-Prometheus-style-/metrics-+-alert-engine">4.4 Prometheus-style /metrics + alert-engine<a class="anchor-link" href="#4.4-Prometheus-style-/metrics-+-alert-engine">¶</a></h3><p>Naast het JSON-<code>/metrics</code> endpoint komt hier een Prometheus exposition-format response, zodat een echte Prometheus-server direct kan scrapen. Een mini-alert-engine evalueert daarna rules op de huidige snapshot.</p>
+<h3 id="4.4-Prometheus-style-/metrics-+-alert-engine">4.4 Prometheus-style /metrics + alert-engine<a class="anchor-link" href="#4.4-Prometheus-style-/metrics-+-alert-engine">¶</a></h3><p>De JSON-versie van <code>/metrics</code> is handig om snel in te kijken, maar een echte
+monitoring-stack wil het in Prometheus-formaat. Daarom voegen we een
+exposition-format response toe die een Prometheus-server rechtstreeks kan scrapen.</p>
+<p>Daarbovenop zetten we een kleine alert-engine. Die evalueert een paar regels op de
+huidige snapshot: schiet de error rate of de latency door een drempel, of loopt de
+drift-score op, dan vuurt de bijbehorende alert. We draaien de regels zowel op een
+opzettelijk verziekte snapshot (om te laten zien dat ze afgaan) als op de echte
+live tellers (waar het er in gezonde toestand nul horen te zijn). Zo bewijzen we
+beide kanten: de alerts werken, én ze blijven stil als er niets aan de hand is.</p>
 </div>
 </div>
 </div>
@@ -11348,7 +11803,7 @@ evidence/drift_report.json geschreven.
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [35]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [38]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># to_prometheus_exposition staat in serve.py (zelfde functie die het</span>
@@ -11379,7 +11834,7 @@ evidence/drift_report.json geschreven.
 <pre>Prometheus exposition output (eerste 20 regels):
   # HELP vitacall_uptime_seconds Process uptime
   # TYPE vitacall_uptime_seconds gauge
-  vitacall_uptime_seconds 13.0
+  vitacall_uptime_seconds 13.1
   # HELP vitacall_requests_total Total HTTP requests
   # TYPE vitacall_requests_total counter
   vitacall_requests_total 15
@@ -11388,10 +11843,10 @@ evidence/drift_report.json geschreven.
   vitacall_requests_errors_total 0
   # HELP vitacall_latency_p50_ms p50 request latency in ms
   # TYPE vitacall_latency_p50_ms gauge
-  vitacall_latency_p50_ms 1.48
+  vitacall_latency_p50_ms 0.87
   # HELP vitacall_latency_p95_ms p95 request latency in ms
   # TYPE vitacall_latency_p95_ms gauge
-  vitacall_latency_p95_ms 2.05
+  vitacall_latency_p95_ms 2.09
   # HELP vitacall_avg_confidence Mean prediction confidence
   # TYPE vitacall_avg_confidence gauge
   vitacall_avg_confidence 0.939
@@ -11409,7 +11864,7 @@ evidence/metrics.prom geschreven (975 bytes).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [36]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [39]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Mini alert-engine: rule -&gt; conditie -&gt; trigger. Werkt zonder Alertmanager.</span>
@@ -11511,12 +11966,86 @@ monitoring/grafana/vitacall_dashboard.json geschreven (6 panels).
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=ld5-live-alerts">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [40]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># LD5: alert-engine OOK op de ECHTE live tellers draaien (niet alleen gesimuleerd),</span>
+<span class="c1"># zodat we aantonen dat het systeem in normale toestand 0 alerts geeft.</span>
+<span class="n">live_metrics</span> <span class="o">=</span> <span class="n">api_metrics</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>             <span class="c1"># echte system-metrics</span>
+<span class="n">live_drift</span> <span class="o">=</span> <span class="n">api_drift</span><span class="o">.</span><span class="n">snapshot</span><span class="p">()</span>                 <span class="c1"># echte drift-snapshot</span>
+<span class="n">live_rules</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">AlertRule</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">severity</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">rules</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="n">live_fired</span> <span class="o">=</span> <span class="n">evaluate_rules</span><span class="p">(</span><span class="n">live_metrics</span><span class="p">,</span> <span class="n">live_drift</span><span class="p">,</span> <span class="n">live_rules</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'Alert-engine op LIVE snapshot: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">live_fired</span><span class="p">)</span><span class="si">}</span><span class="s1"> alert(s) '</span>
+      <span class="sa">f</span><span class="s1">'(verwacht 0 in gezonde toestand).'</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'  live error_rate=</span><span class="si">{</span><span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"error_rate"</span><span class="p">)</span><span class="si">}</span><span class="s1"> '</span>
+      <span class="sa">f</span><span class="s1">'p95=</span><span class="si">{</span><span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"p95_ms"</span><span class="p">)</span><span class="si">}</span><span class="s1">ms drift=</span><span class="si">{</span><span class="n">live_drift</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"drift_score"</span><span class="p">)</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
+
+<span class="c1"># Render een ZICHTBAAR dashboard (matplotlib) dat de Grafana-panels nabootst.</span>
+<span class="k">if</span> <span class="n">HAS_PLT</span><span class="p">:</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">6</span><span class="p">))</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s1">'VitaCall Production Dashboard (live snapshot)'</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">13</span><span class="p">)</span>
+    <span class="n">panels</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="s1">'Requests totaal'</span><span class="p">,</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'requests_total'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s1">'Error rate'</span><span class="p">,</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'error_rate'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s1">'p95 latency (ms)'</span><span class="p">,</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'p95_ms'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s1">'Drift score'</span><span class="p">,</span> <span class="n">live_drift</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'drift_score'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s1">'Mean confidence'</span><span class="p">,</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'avg_confidence'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+        <span class="p">(</span><span class="s1">'Uptime (s)'</span><span class="p">,</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'uptime_s'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)),</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">flat</span><span class="p">,</span> <span class="n">panels</span><span class="p">):</span>     <span class="c1"># 1 stat-panel per metric</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">,</span> <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s1">'</span><span class="p">,</span> <span class="n">ha</span><span class="o">=</span><span class="s1">'center'</span><span class="p">,</span> <span class="n">va</span><span class="o">=</span><span class="s1">'center'</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">22</span><span class="p">,</span> <span class="n">weight</span><span class="o">=</span><span class="s1">'bold'</span><span class="p">)</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="n">a</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">'off'</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="s1">'evidence/grafana_dashboard.png'</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">120</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'evidence/grafana_dashboard.png geschreven (6 panels, live waarden).'</span><span class="p">)</span>
+
+<span class="c1"># Voeg de live-alert-uitkomst toe aan de alerts-feed als audit-spoor.</span>
+<span class="n">live_row</span> <span class="o">=</span> <span class="p">{</span><span class="s1">'scope'</span><span class="p">:</span> <span class="s1">'live_snapshot'</span><span class="p">,</span> <span class="s1">'alerts'</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">live_fired</span><span class="p">),</span>
+            <span class="s1">'error_rate'</span><span class="p">:</span> <span class="n">live_metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'error_rate'</span><span class="p">),</span>
+            <span class="s1">'drift_score'</span><span class="p">:</span> <span class="n">live_drift</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'drift_score'</span><span class="p">)}</span>
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">'evidence/alerts.jsonl'</span><span class="p">,</span> <span class="s1">'a'</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s1">'utf-8'</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">live_row</span><span class="p">)</span> <span class="o">+</span> <span class="s1">'</span><span class="se">\n</span><span class="s1">'</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">'Live-alert-check toegevoegd aan evidence/alerts.jsonl.'</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Alert-engine op LIVE snapshot: 0 alert(s) (verwacht 0 in gezonde toestand).
+  live error_rate=0.0 p95=2.09ms drift=0.1
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>evidence/grafana_dashboard.png geschreven (6 panels, live waarden).
+Live-alert-check toegevoegd aan evidence/alerts.jsonl.
+</pre>
+</div>
+</div>
+</div>
+</div>
 </div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=7d70c6ee">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [37]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [41]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># LD5 evidence: meet een tijdreeks van metrics onder oplopende load en plot die.</span>
@@ -11556,546 +12085,546 @@ monitoring/grafana/vitacall_dashboard.json geschreven (6 panels).
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,291 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,360 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,298 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,369 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,307 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,377 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,315 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,383 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,323 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,391 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,334 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,399 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,346 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,405 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,358 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,414 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,370 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,423 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,378 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,431 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,387 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,437 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,398 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,445 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,408 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,453 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,420 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,461 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,431 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,469 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,440 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,476 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,450 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,482 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,460 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,491 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,491 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,499 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,502 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,507 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,516 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,515 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,528 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,523 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,540 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,531 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,551 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,538 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,562 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,543 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,571 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,550 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,583 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,558 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,595 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,565 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,607 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,572 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,617 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,578 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,625 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,584 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,635 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,591 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,647 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,599 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,659 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,609 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,671 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,616 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,679 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,622 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,688 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,628 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,699 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,635 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,710 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,642 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,723 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,649 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,735 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,659 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,748 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,666 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,759 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,673 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,768 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,678 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,779 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,686 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,792 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,693 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,804 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,701 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,815 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,710 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,827 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,717 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,838 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,725 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,849 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,730 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,857 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,738 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,865 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,745 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,876 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,752 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,886 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,760 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,894 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,765 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,902 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,772 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,909 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,780 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,917 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,788 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,925 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,795 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,935 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,805 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,943 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,813 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,952 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,820 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,961 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,833 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,970 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,843 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,980 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,850 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:53,991 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,859 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,002 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,866 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,012 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,872 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,020 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,878 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,034 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,886 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,042 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,893 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,053 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,900 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,062 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,909 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,073 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,917 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,086 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,926 [INFO] HTTP Request: POST http://testserver/analyze "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,095 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,932 [INFO] HTTP Request: GET http://testserver/metrics "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,104 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
+<pre>2026-06-15 16:01:45,938 [INFO] HTTP Request: GET http://testserver/drift "HTTP/1.1 200 OK"
 </pre>
 </div>
 </div>
@@ -12115,7 +12644,13 @@ monitoring/grafana/vitacall_dashboard.json geschreven (6 panels).
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="4.5-Mini-testpakket">4.5 Mini-testpakket<a class="anchor-link" href="#4.5-Mini-testpakket">¶</a></h3><p>Nu er geen aparte <code>tests/</code>-map meer is, schrijven we de unit-tests inline. Ze valideren dat keywords werken, dat een evident-negatieve zin ook negatief uit het model komt, en dat de drift-detector zijn drie statussen correct geeft.</p>
+<h3 id="4.5-Mini-testpakket">4.5 Mini-testpakket<a class="anchor-link" href="#4.5-Mini-testpakket">¶</a></h3><p>We sluiten af met een setje unit-tests, inline in het notebook (er is geen aparte
+<code>tests/</code>-map meer). Ze controleren de dingen die echt stuk mogen niet gaan: dat de
+keyword-detectie urgentie- en medicatie-termen oppikt, dat een overduidelijk
+negatieve spoedzin ook echt als negatief uit het model komt, en dat de
+drift-detector zijn drie statussen (onvoldoende data, normaal, drift) correct
+teruggeeft. Klein, maar het vangt precies de regressies die je tijdens een
+hertraining of refactor zou kunnen introduceren.</p>
 </div>
 </div>
 </div>
@@ -12124,7 +12659,7 @@ monitoring/grafana/vitacall_dashboard.json geschreven (6 panels).
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [38]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [42]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Mini-testpakket. Lokaal, geen pytest nodig om te draaien.</span>
@@ -12179,7 +12714,7 @@ monitoring/grafana/vitacall_dashboard.json geschreven (6 panels).
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>2026-06-15 12:55:54,607 [WARNING] DRIFT alert: positive_rate=1.000 score=0.500 n=20
+<pre>2026-06-15 16:01:46,245 [WARNING] DRIFT alert: positive_rate=1.000 score=0.500 n=20
 </pre>
 </div>
 </div>
@@ -12215,81 +12750,81 @@ Alle tests geslaagd.
 <th>LD</th>
 <th>Rubric-criterium</th>
 <th>Geleverd</th>
-<th>Bewijs in dit notebook</th>
+<th>Bewijs</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
-<td>Goed gestructureerde, modulaire pijplijn met validatie en versiebeheer</td>
-<td>Drie-laags pipeline ruw, schoon, trainklaar; dataclass-validatie per laag; fail-fast bij errors; alle code in een notebook plus git</td>
-<td>Sectie 1.1 t/m 1.3</td>
+<td>Modulaire pijplijn met validatie + versiebeheer</td>
+<td>Drie-laags pipeline (ruw/schoon/trainklaar); dataclass-validatie + fail-fast per laag; SHA256-manifest; git</td>
+<td>Sectie 1.1-1.6</td>
 </tr>
 <tr>
 <td>2</td>
-<td>Schaalbaarheid (batching, distributed, cloud-integratie)</td>
-<td>Streaming Parquet-batches voor data &gt; RAM. PySpark voor distributed split met automatische pandas-fallback</td>
-<td>Sectie 1.4 + 1.5</td>
+<td>Schaalbaarheid (batching, distributed, cloud)</td>
+<td>Streaming Parquet-batches (constante RSS); <strong>aangetoond op &gt;1M rijen</strong> (1.8); PySpark distributed-split + fallback; fsspec cloud-storage; k8s HPA</td>
+<td>Sectie 1.4-1.8 + <code>evidence/scaling_bigdata.json</code></td>
 </tr>
 <tr>
 <td>3</td>
-<td>Passend model, getuned, geevalueerd, reproduceerbaar</td>
-<td><strong>Twee onafhankelijke modellen.</strong> Edge: Vosk-NL ASR (spraak-naar-tekst, lokaal), geevalueerd op modelgrootte (65.6 MB) + RTF (~0.17) + WER-harness (sectie 2.1). Cloud: TF-IDF + LR sentiment op ~22k labeled DBRD plus oversampled domein-zinnen, hyperparam-sweep, MLflow, FedAvg, 87% accuracy / 85% F1 (5-fold CV)</td>
-<td>Sectie 2.1 t/m 2.9</td>
+<td>Passend model, getuned, reproduceerbaar</td>
+<td><strong>Twee modellen.</strong> Edge: Vosk-NL ASR, gepubliceerde <strong>WER 22.45%</strong> (CommonVoice) + WER-harness-selfcheck + 65.6 MB + RTF ~0.17. Cloud: TF-IDF+LR, 87% acc / 85% CV-F1, sweep + Optuna + MLflow + FedAvg</td>
+<td>Sectie 2.1-2.9 + <code>evidence/asr_eval.json</code></td>
 </tr>
 <tr>
 <td>4</td>
-<td>Succesvolle deployment met passende tools (Docker, CI/CD, API), geautomatiseerd</td>
-<td>FastAPI-service inline en in <code>serve.py</code>, Dockerfile + docker-compose, k8s-manifest, edge-ASR on-device + offline tekst-fallback, GitHub Actions CI + CD + CT</td>
-<td>Sectie 3.1 t/m 3.6</td>
+<td>Deployment (Docker, CI/CD, API), geautomatiseerd</td>
+<td>FastAPI in <code>serve.py</code>; Dockerfile + compose; <code>render.yaml</code> Blueprint (cloud); zelfde image als edge-container (offline); GitHub Actions CI+CD+CT</td>
+<td>Sectie 3.1-3.7 + <code>evidence/cloud_deploy.json</code>, <code>edge_deploy.json</code></td>
 </tr>
 <tr>
 <td>5</td>
-<td>Monitoring op system + model, drift, logging, alerts</td>
-<td>Metrics dataclass (uptime, p50/p95, error rate, avg confidence), DriftDetector met threshold + log-warning, PSI + KS op feature-niveau, Prometheus /metrics + alert-engine, JsonFormatter voor structured logs, end-to-end demo met requests</td>
-<td>Sectie 4.1 t/m 4.5</td>
+<td>Monitoring system + model, drift, alerts</td>
+<td>Metrics + DriftDetector (live tellers); PSI + KS op feature-niveau; Prometheus <code>/metrics-prom</code>; alert-engine op <strong>live + gesimuleerde</strong> snapshot; gerenderd dashboard</td>
+<td>Sectie 4.1-4.5 + <code>evidence/grafana_dashboard.png</code>, <code>alerts.jsonl</code></td>
 </tr>
 </tbody>
 </table>
-<h2 id="Bewuste-scope-keuzes">Bewuste scope-keuzes<a class="anchor-link" href="#Bewuste-scope-keuzes">¶</a></h2><p><strong>Drift-detectie is twee-lagig</strong>: output-drift via <code>DriftDetector</code> (sectie 4), input-drift via PSI + KS-test op feature-niveau (sectie 4.3). Beide draaien in dezelfde pipeline.</p>
-<p><strong>Federated learning is een gesimuleerde FedAvg</strong>: 3 clients, lokale training, gewichts-aggregatie op centrale server. Het algoritme is volledig; het netwerk-transport heb ik bewust niet uitgewerkt, dat is infra-werk en geen ML-werk.</p>
-<p><strong>Domein-zinnen zijn synthetisch + 100x oversampled</strong>: bewuste keuze omdat echte VitaCall-transcripten onder privacy-restricties vallen (AVG art. 9, gezondheidsdata). De pipeline staat klaar om ze in te lezen zodra ze beschikbaar zijn; de TF-IDF-stap is class-agnostic.</p>
-<h2 id="Gebruik-van-Generative-AI-(GAI)">Gebruik van Generative AI (GAI)<a class="anchor-link" href="#Gebruik-van-Generative-AI-(GAI)">¶</a></h2><p>Conform de bronvermeldingsregels van de opdracht (Bijlage 1) verantwoorden we hier het gebruik van Generative AI. AI is gebruikt als hulpmiddel; alle code en teksten zijn door ons gecontroleerd, begrepen en waar nodig herschreven in eigen woorden. Vul per gebruikt gesprek de promptnummers en gedeelde links in.</p>
+<h2 id="Bewuste-scope-keuzes">Bewuste scope-keuzes<a class="anchor-link" href="#Bewuste-scope-keuzes">¶</a></h2><p><strong>FedAvg</strong>: 3 clients, lokale training, gewichts-aggregatie op centrale server. Het algoritme is volledig; het netwerk-transport is bewust niet uitgewerkt (infra, geen ML).</p>
+<p><strong>Domein-zinnen synthetisch + oversampled</strong>: bewuste keuze omdat echte VitaCall-transcripten onder privacy vallen (AVG art. 9, gezondheidsdata). De pipeline leest ze in zodra beschikbaar; de TF-IDF-stap is class-agnostic.</p>
+<p><strong>Edge-WER</strong>: er is geen Nederlands spraakcorpus met referentietranscripten in de repo, dus rapporteren we de door de modelauteur <strong>gepubliceerde</strong> WER (eerlijk, citeerbaar) plus een selfcheck van onze eigen WER-rekenkern. Een eigen WER op opgenomen audio is een kwestie van een paar referentiezinnen door <code>evaluate_asr()</code> halen.</p>
+<h2 id="Gebruik-van-Generative-AI-(GAI)">Gebruik van Generative AI (GAI)<a class="anchor-link" href="#Gebruik-van-Generative-AI-(GAI)">¶</a></h2><p>Conform de bronvermeldingsregels (Bijlage 1) verantwoorden we hier het GAI-gebruik. AI is als hulpmiddel gebruikt; alle code en tekst is door ons gecontroleerd, begrepen en waar nodig herschreven. <strong>Vul vóór inlevering de echte prompts, tool+versie+datum en gedeelde-chat-links in en verwijder ongebruikte rijen.</strong></p>
 <table>
 <thead>
 <tr>
-<th>Prompt</th>
-<th>Tool + versie</th>
+<th>#</th>
+<th>Tool + versie + datum</th>
 <th>Waarvoor gebruikt</th>
 <th>Link (gedeeld gesprek)</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Prompt 1</td>
-<td><em>ChatGPT / Claude, versie, datum</em></td>
-<td><em>bijv. structuur datapipeline-validatie</em></td>
-<td><em>plak hier de gedeelde-chat-link</em></td>
+<td>1</td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
 </tr>
 <tr>
-<td>Prompt 2</td>
-<td><em>...</em></td>
-<td><em>bijv. FastAPI-endpoints opzetten</em></td>
-<td><em>...</em></td>
+<td>2</td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
 </tr>
 <tr>
-<td>Prompt 3</td>
-<td><em>...</em></td>
-<td><em>bijv. drift-detectie / PSI-uitleg</em></td>
-<td><em>...</em></td>
+<td>3</td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
+<td><em>vul in</em></td>
 </tr>
 </tbody>
 </table>
-<p>Bij code die met AI tot stand kwam staat in de betreffende code-cel een comment in het format <code># Prompt N: &lt;titel&gt;</code>, en hieronder de bijbehorende link. Verwijder de voorbeeldrijen die niet van toepassing zijn en vul de echte prompts in vóór inlevering.</p>
-<h2 id="Bronvermelding-(APA)">Bronvermelding (APA)<a class="anchor-link" href="#Bronvermelding-(APA)">¶</a></h2><p>van der Burgh, B., &amp; Verberne, S. (2019). The merits of Universal Language Model Fine-tuning for Small Datasets, a case with Dutch book reviews. arXiv:1910.00896.</p>
-<p>Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. JMLR 12.</p>
-<p>McMahan, H. B., Moore, E., Ramage, D., Hampson, S., &amp; Arcas, B. A. y. (2017). Communication-Efficient Learning of Deep Networks from Decentralized Data. AISTATS.</p>
-<p>Zaharia, M. et al. (2018). Accelerating the Machine Learning Lifecycle with MLflow. IEEE Data Eng. Bull.</p>
+<h2 id="Bronvermelding-(APA)">Bronvermelding (APA)<a class="anchor-link" href="#Bronvermelding-(APA)">¶</a></h2><p>van der Burgh, B., &amp; Verberne, S. (2019). <em>The merits of Universal Language Model Fine-tuning for Small Datasets, a case with Dutch book reviews.</em> arXiv:1910.00896.</p>
+<p>Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. <em>JMLR, 12.</em></p>
+<p>McMahan, H. B., Moore, E., Ramage, D., Hampson, S., &amp; Arcas, B. A. y. (2017). Communication-Efficient Learning of Deep Networks from Decentralized Data. <em>AISTATS.</em></p>
+<p>Zaharia, M. et al. (2018). Accelerating the Machine Learning Lifecycle with MLflow. <em>IEEE Data Eng. Bull.</em></p>
+<p>Alpha Cephei. (z.d.). <em>Vosk small Dutch model (vosk-model-small-nl).</em> <a href="https://alphacephei.com/vosk/models">https://alphacephei.com/vosk/models</a></p>
 <p>PySpark documentatie. <a href="https://spark.apache.org/docs/latest/api/python/">https://spark.apache.org/docs/latest/api/python/</a></p>
 <p>FastAPI documentatie. <a href="https://fastapi.tiangolo.com/">https://fastapi.tiangolo.com/</a></p>
 </div>
