@@ -13,6 +13,7 @@ data/
 artifacts/
 .pytest_cache/
 mlruns/
+mlflow.db
 main_executed.ipynb
 _executed*.ipynb
 

@@ -1,29 +1,29 @@
 {
-  "engine": "pandas (Spark overgeslagen: Windows zonder winutils.exe (HADOOP_HOME ontbreekt))",
+  "engine": "pandas (Spark overgeslagen: geen Java/JVM op PATH)",
   "results": [
     {
       "batch_size": 1000,
       "rows": 22252,
-      "elapsed_s": 2.28,
-      "throughput_rps": 9740,
-      "peak_rss_mb": 911.4,
-      "rss_before_mb": 909.0
+      "elapsed_s": 1.32,
+      "throughput_rps": 16829,
+      "peak_rss_mb": 1108.7,
+      "rss_before_mb": 1108.5
     },
     {
       "batch_size": 5000,
       "rows": 22252,
-      "elapsed_s": 2.19,
-      "throughput_rps": 10140,
-      "peak_rss_mb": 900.2,
-      "rss_before_mb": 841.6
+      "elapsed_s": 1.2,
+      "throughput_rps": 18502,
+      "peak_rss_mb": 949.2,
+      "rss_before_mb": 885.4
     },
     {
       "batch_size": 20000,
       "rows": 22252,
-      "elapsed_s": 2.22,
-      "throughput_rps": 10025,
-      "peak_rss_mb": 957.8,
-      "rss_before_mb": 864.7
+      "elapsed_s": 1.19,
+      "throughput_rps": 18724,
+      "peak_rss_mb": 1088.2,
+      "rss_before_mb": 949.2
     }
   ]
 }

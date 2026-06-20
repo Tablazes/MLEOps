@@ -35,7 +35,7 @@ k8s/deployment.yaml     alternatief deploy-manifest (2 replicas, liveness/readin
 .github/workflows/cicd.yml
 monitoring/             prometheus scrape-config
 evidence/               plots + rapporten (gegenereerd door notebook)
-models/vosk-nl/         edge ASR-model (Vosk-NL, ~65.6 MB)
+models/vosk-nl/         optioneel lokaal edge ASR-model (gitignored vanwege omvang)
 models/sentiment_heavy.pkl
 ```
 
@@ -45,10 +45,10 @@ models/sentiment_heavy.pkl
 
 | Metric | Werkelijk |
 |---|---|
-| Modelgrootte op schijf | 65.6 MB |
-| Laadtijd | ~0.4 s |
-| RTF (decode-tijd / audio-duur) op CPU | ~0.17 (≈6x sneller dan realtime) |
-| WER | gemeten via de inline WER-harness in het notebook (sectie 2.0) op zelf-opgenomen referentiezinnen; zonder referentie-audio status `geen_referentie_audio` |
+| Modelgrootte op schijf | gemeten wanneer `models/vosk-nl/` lokaal aanwezig is |
+| Laadtijd | gemeten wanneer het model lokaal aanwezig is |
+| RTF (decode-tijd / audio-duur) op CPU | gemeten op toegevoegde referentie-audio |
+| WER | inline WER-harness in sectie 2.1; zonder model/README status `model_reference_missing`, zonder referentie-audio geen eigen WER |
 
 Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
 

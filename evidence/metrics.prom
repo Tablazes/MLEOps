@@ -1,24 +1,24 @@
 # HELP vitacall_uptime_seconds Process uptime
 # TYPE vitacall_uptime_seconds gauge
-vitacall_uptime_seconds 12.5
+vitacall_uptime_seconds 2.2
 # HELP vitacall_requests_total Total HTTP requests
 # TYPE vitacall_requests_total counter
-vitacall_requests_total 14
+vitacall_requests_total 15
 # HELP vitacall_requests_errors_total Total errored requests
 # TYPE vitacall_requests_errors_total counter
 vitacall_requests_errors_total 0
 # HELP vitacall_latency_p50_ms p50 request latency in ms
 # TYPE vitacall_latency_p50_ms gauge
-vitacall_latency_p50_ms 1.16
+vitacall_latency_p50_ms 0.81
 # HELP vitacall_latency_p95_ms p95 request latency in ms
 # TYPE vitacall_latency_p95_ms gauge
-vitacall_latency_p95_ms 2.11
+vitacall_latency_p95_ms 1.24
 # HELP vitacall_avg_confidence Mean prediction confidence
 # TYPE vitacall_avg_confidence gauge
-vitacall_avg_confidence 0.935
+vitacall_avg_confidence 0.941
 # HELP vitacall_drift_score Output-distribution drift score
 # TYPE vitacall_drift_score gauge
-vitacall_drift_score 0.071
+vitacall_drift_score 0.1
 # HELP vitacall_drift_samples Samples in drift window
 # TYPE vitacall_drift_samples gauge
-vitacall_drift_samples 14
+vitacall_drift_samples 15

@@ -1,4 +1,4 @@
 model,accuracy,f1,roc_auc
-LogReg,0.8706,0.8706,0.9457
-LinearSVC_cal,0.8747,0.8746,0.9492
-MultinomialNB,0.8306,0.8305,0.9073
+LogReg,0.8697,0.8697,0.9461
+LinearSVC_cal,0.8751,0.8751,0.9492
+MultinomialNB,0.8311,0.8309,0.9075
