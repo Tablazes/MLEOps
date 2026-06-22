@@ -1,29 +1,29 @@
 {
-  "engine": "pandas (Spark overgeslagen: Windows zonder winutils.exe (HADOOP_HOME ontbreekt))",
+  "engine": "PySpark (distributed, local[*])",
   "results": [
     {
       "batch_size": 1000,
       "rows": 22252,
-      "elapsed_s": 3.62,
-      "throughput_rps": 6147,
-      "peak_rss_mb": 906.3,
-      "rss_before_mb": 905.9
+      "elapsed_s": 3.55,
+      "throughput_rps": 6259,
+      "peak_rss_mb": 885.0,
+      "rss_before_mb": 884.7
     },
     {
       "batch_size": 5000,
       "rows": 22252,
-      "elapsed_s": 3.73,
-      "throughput_rps": 5968,
-      "peak_rss_mb": 903.9,
-      "rss_before_mb": 833.7
+      "elapsed_s": 3.31,
+      "throughput_rps": 6716,
+      "peak_rss_mb": 879.0,
+      "rss_before_mb": 812.2
     },
     {
       "batch_size": 20000,
       "rows": 22252,
-      "elapsed_s": 3.26,
-      "throughput_rps": 6830,
-      "peak_rss_mb": 975.9,
-      "rss_before_mb": 881.1
+      "elapsed_s": 3.24,
+      "throughput_rps": 6868,
+      "peak_rss_mb": 932.3,
+      "rss_before_mb": 837.6
     }
   ]
 }

@@ -19,6 +19,18 @@ jupyter nbconvert --to notebook --execute main.ipynb   # train modellen + genere
 uvicorn serve:app --host 0.0.0.0 --port 8000           # cloud-API lokaal
 ```
 
+**Vereiste voor de PySpark-split (Windows):** de datapijplijn gebruikt Spark verplicht
+(geen pandas-fallback). Spark schrijft op Windows alleen naar schijf met `winutils.exe`.
+Zet `HADOOP_HOME` naar een map met `bin\winutils.exe` + `hadoop.dll` (Hadoop 3.3.x, bv.
+via github.com/cdarlint/winutils) voordat je het notebook draait:
+
+```powershell
+$env:HADOOP_HOME = "$env:USERPROFILE\hadoop"   # map met bin\winutils.exe
+```
+
+Ontbreekt dit, dan stopt de split-cel met een duidelijke `RuntimeError` in plaats van
+stilletjes terug te vallen. Op Linux/cloud is alleen een JVM nodig.
+
 Of via Docker (zelfde image lokaal en in productie):
 
 ```powershell

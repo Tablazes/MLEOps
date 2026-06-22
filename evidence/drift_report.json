@@ -1,20 +1,20 @@
 {
-  "reference_size": 17799,
+  "reference_size": 17933,
   "scenarios": [
     {
       "name": "test-set",
-      "size": 2226,
-      "psi": 0.0023,
-      "ks_stat": 0.0167,
-      "ks_p": 0.635937094889022,
+      "size": 2030,
+      "psi": 0.0074,
+      "ks_stat": 0.0223,
+      "ks_p": 0.32172275668989836,
       "verdict": "stabiel"
     },
     {
       "name": "short-only",
-      "size": 549,
-      "psi": 8.9485,
-      "ks_stat": 0.7485,
-      "ks_p": 4.30893900192077e-309,
+      "size": 504,
+      "psi": 8.983,
+      "ks_stat": 0.7559,
+      "ks_p": 2.3528429197783543e-291,
       "verdict": "significante drift"
     }
   ]
