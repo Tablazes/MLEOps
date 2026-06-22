@@ -1,7 +1,23 @@
 {
-  "docker_available": false,
+  "docker_available": true,
   "image": "vitacall:edge",
-  "health": null,
-  "analyze": null,
+  "health": {
+    "status": "healthy",
+    "model_loaded": true
+  },
+  "analyze": {
+    "sentiment": "negatief",
+    "confidence": 0.982,
+    "keywords": [
+      {
+        "text": "bewusteloos",
+        "type": "urgentie"
+      },
+      {
+        "text": "gevallen",
+        "type": "urgentie"
+      }
+    ]
+  },
   "offline": true
 }
