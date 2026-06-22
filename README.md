@@ -2,11 +2,11 @@
 
 [![CI/CD](https://github.com/Tablazes/MLEOps/actions/workflows/cicd.yml/badge.svg)](https://github.com/Tablazes/MLEOps/actions/workflows/cicd.yml)
 
-**Live cloud-API:** https://mleops.onrender.com (Render, Docker, free tier) — endpoints `/health`, `/analyze`, `/metrics`, `/metrics-prom`.
+**Live cloud-API:** https://mleops.onrender.com (Render, Docker, free tier), endpoints `/health`, `/analyze`, `/metrics`, `/metrics-prom`.
 
 Nederlandse alarmcentrale-assistent. Twee onafhankelijke modellen voor binnenkomende gesprekken:
 
-- **Edge (lokaal op de operator-pc): Vosk-NL ASR** zet audio om naar tekst. De ruwe audio verlaat het apparaat nooit — dit is de privacy-oplossing en dit is het edge-model.
+- **Edge (lokaal op de operator-pc): Vosk-NL ASR** zet audio om naar tekst. De ruwe audio verlaat het apparaat nooit; dit is de privacy-oplossing en het edge-model.
 - **Cloud: TF-IDF + Logistic Regression** sentiment/urgentie-classifier draait op de ge-de-identificeerde tekst (geen audio). Een los model met een eigen taak, data en evaluatie.
 
 Spoed-keywords + drift-detectie draaien live op de transcript.
@@ -53,7 +53,7 @@ models/sentiment_heavy.pkl
 
 ## Cijfers (gemeten)
 
-**Edge — Vosk-NL ASR** (audio -> tekst, lokaal):
+**Edge: Vosk-NL ASR** (audio -> tekst, lokaal):
 
 | Metric | Werkelijk |
 |---|---|
@@ -62,15 +62,15 @@ models/sentiment_heavy.pkl
 | RTF (decode-tijd / audio-duur) op CPU | gemeten op toegevoegde referentie-audio |
 | WER | inline WER-harness in sectie 2.1; zonder model/README status `model_reference_missing`, zonder referentie-audio geen eigen WER |
 
-Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door een paar referentiezinnen op te nemen en die door de WER-harness te halen — geen verzonnen getal.
+Er zit (nog) geen Nederlands spraakcorpus met referentie-transcripties in de repo. Een echte WER krijg je door een paar referentiezinnen op te nemen en die door de WER-harness te halen (geen verzonnen getal).
 
-**Cloud — sentiment/urgentie-classifier** (tekst -> label):
+**Cloud: sentiment/urgentie-classifier** (tekst -> label):
 
 | Metric | Doel | Werkelijk |
 |---|---|---|
 | Test-accuracy | ≥ 0.85 | 0.871 |
 | CV-F1 mean (5-fold) | ≥ 0.80 | 0.848 ± 0.056 |
-| Inference p95 | ≤ 50 ms | ~5–15 ms |
+| Inference p95 | ≤ 50 ms | ~5-15 ms |
 
 ## CI/CD/CT
 
