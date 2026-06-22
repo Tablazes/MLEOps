@@ -1,12 +1,12 @@
 {
-  "target": "local-inprocess",
+  "target": "https://mleops.onrender.com",
   "health": {
     "status": "healthy",
     "model_loaded": true
   },
   "analyze": {
     "sentiment": "negatief",
-    "confidence": 0.992,
+    "confidence": 0.997,
     "keywords": [
       {
         "text": "pijn op de borst",
