@@ -1,9 +1,12 @@
 {
-  "status": "model_reference_missing",
-  "published_wer_pct": [],
-  "published_wer_best": null,
-  "bron": null,
+  "status": "published_reference_available",
+  "published_wer_pct": [
+    22.45,
+    26.8
+  ],
+  "published_wer_best": 22.45,
+  "bron": "models\\vosk-nl\\README",
   "harness_selfcheck": "pass",
-  "model_size_mb": null,
+  "model_size_mb": 65.6,
   "rtf_cpu": null
 }
