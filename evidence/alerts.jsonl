@@ -1,4 +1,0 @@
-{"name": "HighErrorRate", "severity": "critical", "condition": "error_rate > 5%", "fired_at": 1782138566.9954286}
-{"name": "HighLatency", "severity": "warning", "condition": "p95_latency > 500ms", "fired_at": 1782138566.99543}
-{"name": "ModelDrift", "severity": "warning", "condition": "drift_score > 0.3", "fired_at": 1782138566.9954307}
-{"scope": "live_snapshot", "alerts": 0, "error_rate": 0.0, "drift_score": 0.071}

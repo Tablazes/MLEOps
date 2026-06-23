@@ -1,7 +1,0 @@
-{
-  "rows": 267024,
-  "tiles": 12,
-  "throughput_rows_per_sec": 9420,
-  "peak_rss_mb": 1275.2,
-  "conclusie": "piek-RSS blijft in dezelfde orde bij 12x meer rijen"
-}
