@@ -7,144 +7,144 @@
         "ref": "pijn op de borst",
         "hyp": "Bijna op de boorsd.",
         "wer": 0.5,
-        "rtf": 2.145
+        "rtf": 1.002
       },
       {
         "wav": "ref_01.wav",
         "ref": "mijn moeder is gevallen",
         "hyp": "Mijn moeder is gevallen.",
         "wer": 0.0,
-        "rtf": 0.417
+        "rtf": 0.361
       },
       {
         "wav": "ref_02.wav",
         "ref": "ik kan niet ademen",
         "hyp": "Ik kan niet ademen.",
         "wer": 0.0,
-        "rtf": 0.389
+        "rtf": 0.366
       },
       {
         "wav": "ref_03.wav",
         "ref": "de patient heeft koorts",
         "hyp": "De patient heeft korts.",
         "wer": 0.25,
-        "rtf": 0.31
+        "rtf": 0.29
       },
       {
         "wav": "ref_04.wav",
         "ref": "stuur een ambulance naar de hoofdstraat",
         "hyp": "Sturen ambulansen naar de hoofdstraat.",
         "wer": 0.5,
-        "rtf": 0.289
+        "rtf": 0.248
       },
       {
         "wav": "ref_05.wav",
         "ref": "bel onmiddellijk een dokter",
         "hyp": "Bel om middelijken doctor.",
         "wer": 0.75,
-        "rtf": 0.411
+        "rtf": 0.311
       },
       {
         "wav": "ref_06.wav",
         "ref": "de patient is bewusteloos geraakt",
         "hyp": "De patient is bewustelos geraakt.",
         "wer": 0.2,
-        "rtf": 0.294
+        "rtf": 0.232
       },
       {
         "wav": "ref_07.wav",
         "ref": "er is veel bloed bij de wond",
         "hyp": "Er is veel bloed bij de wont.",
         "wer": 0.143,
-        "rtf": 0.396
+        "rtf": 0.304
       },
       {
         "wav": "ref_08.wav",
         "ref": "hij heeft hevige pijn in zijn buik",
         "hyp": "Hij heeft heel veel gepijn in zijn buik.",
         "wer": 0.429,
-        "rtf": 0.345
+        "rtf": 0.286
       },
       {
         "wav": "ref_09.wav",
         "ref": "mijn vader krijgt geen lucht meer",
         "hyp": "mijn vader krijgt geen lucht meer.",
         "wer": 0.0,
-        "rtf": 0.325
+        "rtf": 0.311
       },
       {
         "wav": "ref_10.wav",
         "ref": "de ambulance is onderweg naar u",
         "hyp": "De ambulance is onderweg naar u.",
         "wer": 0.0,
-        "rtf": 0.302
+        "rtf": 0.29
       },
       {
         "wav": "ref_11.wav",
         "ref": "blijf rustig en haal diep adem",
         "hyp": "blijf rustig en haldiep adem.",
         "wer": 0.333,
-        "rtf": 0.362
+        "rtf": 0.319
       },
       {
         "wav": "ref_12.wav",
         "ref": "ik zie iemand op de grond liggen",
         "hyp": "Ik zie iemand op de grond liggen.",
         "wer": 0.0,
-        "rtf": 0.415
+        "rtf": 0.367
       },
       {
         "wav": "ref_13.wav",
         "ref": "haar hart klopt heel onregelmatig",
         "hyp": "haar hart klopt heel onregelmatig.",
         "wer": 0.0,
-        "rtf": 0.329
+        "rtf": 0.29
       },
       {
         "wav": "ref_14.wav",
         "ref": "geef de patient niets te eten of drinken",
         "hyp": "Geeft de patient niet te eten of drinken?",
         "wer": 0.25,
-        "rtf": 0.32
+        "rtf": 0.285
       },
       {
         "wav": "ref_15.wav",
         "ref": "het slachtoffer reageert niet meer",
         "hyp": "Het slachto voor reagert niet meer.",
         "wer": 0.6,
-        "rtf": 0.33
+        "rtf": 0.318
       },
       {
         "wav": "ref_16.wav",
         "ref": "er is brand op de tweede verdieping",
         "hyp": "En is brand op de tweede verdieping.",
         "wer": 0.143,
-        "rtf": 0.425
+        "rtf": 0.372
       },
       {
         "wav": "ref_17.wav",
         "ref": "kunt u uw adres herhalen alstublieft",
         "hyp": "Kun je u adress herhalen als du blijft?",
         "wer": 1.167,
-        "rtf": 0.438
+        "rtf": 0.341
       },
       {
         "wav": "ref_18.wav",
         "ref": "de oude man is van de trap gevallen",
         "hyp": "De oude man is van de trap gevallen.",
         "wer": 0.0,
-        "rtf": 0.436
+        "rtf": 0.358
       },
       {
         "wav": "ref_19.wav",
         "ref": "zij heeft een allergische reactie",
         "hyp": "zijn heeft een allergie zereiacsy.",
         "wer": 0.6,
-        "rtf": 0.445
+        "rtf": 0.355
       }
     ],
     "mean_wer": 0.2932,
-    "mean_rtf": 0.456
+    "mean_rtf": 0.35
   },
   "after": {
     "model": "models\\whisper-tiny-vitacall-nl",
@@ -152,152 +152,152 @@
       {
         "wav": "ref_00.wav",
         "ref": "pijn op de borst",
-        "hyp": "pijn op de boorsd",
+        "hyp": "pijn op de boorscht",
         "wer": 0.25,
-        "rtf": 0.601
+        "rtf": 0.539
       },
       {
         "wav": "ref_01.wav",
         "ref": "mijn moeder is gevallen",
         "hyp": "mein moeder is gevallen",
         "wer": 0.25,
-        "rtf": 0.426
+        "rtf": 0.457
       },
       {
         "wav": "ref_02.wav",
         "ref": "ik kan niet ademen",
-        "hyp": "ik kom niet uit de me",
-        "wer": 1.0,
-        "rtf": 0.448
+        "hyp": "ik kom niet adomen",
+        "wer": 0.5,
+        "rtf": 0.46
       },
       {
         "wav": "ref_03.wav",
         "ref": "de patient heeft koorts",
         "hyp": "de patient heeft koorts",
         "wer": 0.0,
-        "rtf": 0.342
+        "rtf": 0.367
       },
       {
         "wav": "ref_04.wav",
         "ref": "stuur een ambulance naar de hoofdstraat",
         "hyp": "sturen ambulansen naar de hoofdstraat",
         "wer": 0.5,
-        "rtf": 0.292
+        "rtf": 0.323
       },
       {
         "wav": "ref_05.wav",
         "ref": "bel onmiddellijk een dokter",
-        "hyp": "Bel om middelijken dokter",
-        "wer": 0.5,
-        "rtf": 0.362
+        "hyp": "belomidelekendokter",
+        "wer": 1.0,
+        "rtf": 0.398
       },
       {
         "wav": "ref_06.wav",
         "ref": "de patient is bewusteloos geraakt",
         "hyp": "de patient is bewustelos geraakt",
         "wer": 0.2,
-        "rtf": 0.272
+        "rtf": 0.3
       },
       {
         "wav": "ref_07.wav",
         "ref": "er is veel bloed bij de wond",
         "hyp": "er is veel bloed bij de wont",
         "wer": 0.143,
-        "rtf": 0.353
+        "rtf": 0.401
       },
       {
         "wav": "ref_08.wav",
         "ref": "hij heeft hevige pijn in zijn buik",
-        "hyp": "hij heeft hevel gepijn in zijn buik",
-        "wer": 0.286,
-        "rtf": 0.334
+        "hyp": "hij heeft heel veel gepijn in zijn buik",
+        "wer": 0.429,
+        "rtf": 0.346
       },
       {
         "wav": "ref_09.wav",
         "ref": "mijn vader krijgt geen lucht meer",
         "hyp": "mijn vader krijgt geen lucht meer",
         "wer": 0.0,
-        "rtf": 0.348
+        "rtf": 0.344
       },
       {
         "wav": "ref_10.wav",
         "ref": "de ambulance is onderweg naar u",
         "hyp": "de ambulance is onderweg naar u",
         "wer": 0.0,
-        "rtf": 0.313
+        "rtf": 0.302
       },
       {
         "wav": "ref_11.wav",
         "ref": "blijf rustig en haal diep adem",
-        "hyp": "blijf rustig en hald diep adem",
-        "wer": 0.167,
-        "rtf": 0.361
+        "hyp": "blijf rustig en haal dipadem",
+        "wer": 0.333,
+        "rtf": 0.325
       },
       {
         "wav": "ref_12.wav",
         "ref": "ik zie iemand op de grond liggen",
         "hyp": "ik zie iemand op de grond liggen",
         "wer": 0.0,
-        "rtf": 0.436
+        "rtf": 0.383
       },
       {
         "wav": "ref_13.wav",
         "ref": "haar hart klopt heel onregelmatig",
-        "hyp": "haar hartklopt heel onregenmaatig",
+        "hyp": "haar hartklopt heel onregenmatig",
         "wer": 0.6,
-        "rtf": 0.304
+        "rtf": 0.325
       },
       {
         "wav": "ref_14.wav",
         "ref": "geef de patient niets te eten of drinken",
-        "hyp": "Geeft de beestjeend niet te eten of drinken",
+        "hyp": "geeft de beestjeend niet te eten of drinken",
         "wer": 0.375,
-        "rtf": 0.303
+        "rtf": 0.341
       },
       {
         "wav": "ref_15.wav",
         "ref": "het slachtoffer reageert niet meer",
-        "hyp": "Het slachto voor reagert niet meer",
-        "wer": 0.6,
-        "rtf": 0.288
+        "hyp": "hets slachto voor reagert niet meer",
+        "wer": 0.8,
+        "rtf": 0.321
       },
       {
         "wav": "ref_16.wav",
         "ref": "er is brand op de tweede verdieping",
         "hyp": "en is brand op de tweede verdieping",
         "wer": 0.143,
-        "rtf": 0.336
+        "rtf": 0.367
       },
       {
         "wav": "ref_17.wav",
         "ref": "kunt u uw adres herhalen alstublieft",
-        "hyp": "kunt u u adress her halen als du blijft",
-        "wer": 1.167,
-        "rtf": 0.323
+        "hyp": "kunt u u adres herhalen als du blijft",
+        "wer": 0.667,
+        "rtf": 0.345
       },
       {
         "wav": "ref_18.wav",
         "ref": "de oude man is van de trap gevallen",
         "hyp": "de oude man is van de trap gevallen",
         "wer": 0.0,
-        "rtf": 1.161
+        "rtf": 0.344
       },
       {
         "wav": "ref_19.wav",
         "ref": "zij heeft een allergische reactie",
-        "hyp": "zijn heeft een allergische reak zien",
-        "wer": 0.6,
-        "rtf": 0.697
+        "hyp": "zij heeft een allergische reak zien",
+        "wer": 0.4,
+        "rtf": 0.358
       }
     ],
-    "mean_wer": 0.339,
-    "mean_rtf": 0.415
+    "mean_wer": 0.3295,
+    "mean_rtf": 0.367
   },
   "train": {
-    "max_steps": 80,
-    "sec_per_step": 26.04,
-    "train_loss": 14.5832,
-    "train_runtime_s": 2565.7,
+    "max_steps": 100,
+    "sec_per_step": 20.87,
+    "train_loss": 6.8347,
+    "train_runtime_s": 2754.9,
     "device": "cuda"
   }
 }
