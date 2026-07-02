@@ -33,7 +33,8 @@ FINETUNED_DIR = Path("models/whisper-tiny-vitacall-nl")
 TRAIN_AUDIO_DIR = Path("evidence/zorg_train_audio")
 
 # --------------------------------------------------------------------------- #
-# Held-out testset: identiek aan de 20 zinnen uit evidence/generate_ref_audio.py
+# Held-out testset: 20 vaste zorg-zinnen; de wavs staan in evidence/ref_audio/
+# en zijn met synth() hieronder gegenereerd (gTTS -> ffmpeg 16kHz mono).
 # --------------------------------------------------------------------------- #
 HELDOUT_PAIRS = [
     ("evidence/ref_audio/ref_00.wav", "pijn op de borst"),
