@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir scikit-learn==1.5.2 numpy==1.26.4 \
 COPY serve.py ./
 COPY models/sentiment_heavy.pkl ./models/
 
+# Niet als root draaien: de service heeft alleen leesrechten op /app nodig.
+RUN useradd --no-create-home vitacall && chown -R vitacall /app
+USER vitacall
+
 ENV MODEL_PATH=/app/models/sentiment_heavy.pkl
 # Render injecteert $PORT; lokaal/edge valt het terug op 8000.
 ENV PORT=8000

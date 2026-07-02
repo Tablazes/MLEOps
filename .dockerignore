@@ -1,0 +1,5 @@
+# Alleen serve.py + het cloud-model gaan de image in; de rest van de repo
+# hoort niet in de Docker-buildcontext (sneller bouwen, kleinere kans op lekken).
+*
+!serve.py
+!models/sentiment_heavy.pkl
