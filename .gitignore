@@ -26,3 +26,10 @@ _polish.py
 # Vosk-NL ASR model (66MB, te groot voor git)
 models/vosk-nl/
 nbexec_2026-05-30.log
+
+# Whisper finetune + edge-deploy artefacten (te groot voor git)
+models/whisper-*/
+whisper.cpp/
+data/cv_nl/
+evidence/zorg_train_audio/
+*.bin
