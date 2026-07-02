@@ -242,10 +242,15 @@ class EdgeASRTrainer:
         from transformers import WhisperProcessor
         proc = WhisperProcessor.from_pretrained(self.model_name,
                                                 language="Dutch", task="transcribe")
+        # shift_tokens_right prepend <|startoftranscript|> al als decoder-start;
+        # met SOT ook in de labels traint het model op een verschoven sequentie
+        # (dubbele SOT) en wordt de WER na finetune juist slechter.
+        sot = proc.tokenizer.convert_tokens_to_ids("<|startoftranscript|>")
         feats, labels = [], []
         for arr, tekst in extern_clips + [(self._load_wav(p), t) for p, t in zorg_pairs]:
             feats.append(proc(arr, sampling_rate=SAMPLE_RATE).input_features[0])
-            labels.append(proc.tokenizer(tekst).input_ids)
+            ids = proc.tokenizer(tekst).input_ids
+            labels.append(ids[1:] if ids[0] == sot else ids)
         ds = Dataset.from_dict({"input_features": feats, "labels": labels})
         log.info("Trainingsset: %d voorbeelden (%d openbaar + %d zorg)",
                  len(ds), len(extern_clips), len(zorg_pairs))
