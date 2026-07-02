@@ -36,5 +36,5 @@ trigger
 models/whisper-*/
 whisper.cpp/
 data/cv_nl/
-evidence/zorg_train_audio/
+output/zorg_train_audio/
 *.bin

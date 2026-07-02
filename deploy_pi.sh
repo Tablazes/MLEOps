@@ -99,7 +99,7 @@ EOF
 smoke() {
     curl -s -m 10 "http://$PI_HOST:8080/" >/dev/null && echo "server bereikbaar" || echo "server NIET bereikbaar"
     curl -s -m 120 "http://$PI_HOST:8080/inference" \
-        -F file=@"$REPO_DIR/evidence/ref_audio/ref_00.wav" \
+        -F file=@"$REPO_DIR/output/ref_audio/ref_00.wav" \
         -F response_format=json
     echo
 }
