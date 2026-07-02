@@ -13,3 +13,12 @@ PySide6>=6.6
 sounddevice>=0.4
 vosk>=0.3
 qtawesome>=1.4
+
+# Edge-ASR finetune (Whisper-tiny, zie edge_asr.py) — versies zoals gebruikt
+# op de ontwikkelmachine (Python 3.13, CUDA 12.4, GeForce MX350).
+torch==2.6.0
+transformers==5.2.0
+datasets==5.0.0
+accelerate>=1.2
+gTTS>=2.5
+soundfile>=0.12

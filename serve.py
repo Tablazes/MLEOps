@@ -190,7 +190,11 @@ def build_app(model, *, metrics: "Metrics | None" = None,
 
     @app.get("/health")
     def health():
-        return {"status": "healthy", "model_loaded": model is not None}
+        # Deploy-bewijs: Render injecteert RENDER_GIT_COMMIT, zodat het notebook
+        # kan verifiëren dat de live service exact deze repo-commit draait.
+        return {"status": "healthy", "model_loaded": model is not None,
+                "commit": os.environ.get("RENDER_GIT_COMMIT", "lokaal")[:12],
+                "on_render": bool(os.environ.get("RENDER"))}
 
     @app.post("/analyze", response_model=AnalyzeResponse)
     def analyze(req: AnalyzeRequest):

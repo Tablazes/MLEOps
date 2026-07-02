@@ -27,6 +27,11 @@ _polish.py
 models/vosk-nl/
 nbexec_2026-05-30.log
 
+# Per ongeluk door shell-hooks aangemaakte lege bestanden
+16kHz
+woordenlijst
+trigger
+
 # Whisper finetune + edge-deploy artefacten (te groot voor git)
 models/whisper-*/
 whisper.cpp/
