@@ -106,6 +106,15 @@ test() {
 
 alles() { prep; build; model; service; test; }
 
-stap="${1:-alles}"
+hulp() {
+    sed -n '2,14p' "$0"
+    if ssh -o BatchMode=yes -o ConnectTimeout=5 "$PI" true 2>/dev/null; then
+        echo "Key-login werkt al. Volgende stap: bash deploy_pi.sh alles"
+    else
+        echo "Nog geen key-login. Begin met:   bash deploy_pi.sh keys"
+    fi
+}
+
+stap="${1:-hulp}"
 [ "$stap" = "key" ] && stap=keys   # veelgemaakte typo
 "$stap"
