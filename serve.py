@@ -123,7 +123,7 @@ def to_prometheus_exposition(metrics_snapshot: dict, drift_snapshot: dict) -> st
     """Zet metrics+drift om naar Prometheus exposition-format (text/plain).
 
     Eén HELP/TYPE/value-blok per metric, zodat een Prometheus-server dit kan
-    scrapen op /metrics-prom (zie monitoring/prometheus.yml).
+    scrapen op /metrics-prom.
     """
     lines = []
 

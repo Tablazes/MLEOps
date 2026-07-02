@@ -1,12 +1,12 @@
 # Eén image voor zowel cloud (Render) als edge (Docker op edge-node).
-# Slank gehouden via requirements-deploy.txt (alleen runtime-deps).
+# Runtime-deps staan inline (bewust geen aparte requirements-file): alleen wat
+# serve.py nodig heeft, zodat de image klein blijft en snel bouwt.
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Eerst alleen de requirements kopiëren -> betere layer-cache bij code-changes.
-COPY requirements-deploy.txt ./
-RUN pip install --no-cache-dir -r requirements-deploy.txt
+RUN pip install --no-cache-dir scikit-learn==1.5.2 numpy==1.26.4 \
+    fastapi==0.115.0 uvicorn==0.34.0 pydantic==2.9.2
 
 COPY serve.py ./
 COPY models/sentiment_heavy.pkl ./models/
