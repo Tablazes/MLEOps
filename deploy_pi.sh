@@ -12,7 +12,7 @@
 #   bash deploy_pi.sh alles    # prep t/m test
 set -euo pipefail
 
-PI_USER=${PI_USER:-pi}
+PI_USER=${PI_USER:-thomaskuijv}
 PI_HOST=${PI_HOST:-192.168.68.124}
 PI="$PI_USER@$PI_HOST"
 # accept-new: eerste keer host-key automatisch accepteren (voorkomt
