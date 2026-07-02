@@ -8,7 +8,9 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    autoDeploy: true
+    # CD-gate: pas deployen als de GitHub Actions-checks (test + docker-build)
+    # groen zijn. Vervangt het oude autoDeploy: true (deploy bij elke push).
+    autoDeployTrigger: checksPass
     envVars:
       - key: MODEL_PATH
         value: /app/models/sentiment_heavy.pkl
