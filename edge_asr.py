@@ -6,8 +6,9 @@ gebruik + resultaten. Waarom Whisper i.p.v. Vosk: Vosk/Kaldi is praktisch
 niet te finetunen; Whisper-tiny (39M) wel, en is na quantisatie (q5_0,
 ~31MB) klein genoeg voor een Raspberry Pi Zero 2 W met 512MB RAM.
 
-Trainingsdata = 100% synthetische zorg-audio (gTTS) uit domein-templates:
-er is geen externe dataset-download nodig en echte gespreksaudio verlaat de
+Trainingsdata = mix van openbare Nederlandse spraak (Multilingual LibriSpeech,
+zoals de opdracht "Common Voice of vergelijkbaar" vraagt) en synthetische
+zorg-audio (gTTS) uit domein-templates. Echte gespreksaudio verlaat de
 instelling nooit (privacy-eis). De 20 referentie-wavs in evidence/ref_audio/
 zijn de held-out testset en komen nooit in de training terecht.
 """
@@ -174,6 +175,42 @@ class ZorgAudioBuilder:
 
 
 # --------------------------------------------------------------------------- #
+# Openbare NL-spraak (streaming): Multilingual LibriSpeech, parquet en niet
+# gated (Common Voice vereist een licentie-akkoord; MLS is "vergelijkbaar").
+# --------------------------------------------------------------------------- #
+EXTERN_BRON = "facebook/multilingual_librispeech"
+
+
+def _decode_bytes(raw: bytes) -> np.ndarray | None:
+    """Decodeer audio-bytes (mp3/flac/wav) naar 16kHz mono float32 via ffmpeg."""
+    p = subprocess.run(["ffmpeg", "-i", "pipe:0", "-f", "s16le", "-ar", str(SAMPLE_RATE),
+                        "-ac", "1", "pipe:1"], input=raw, capture_output=True)
+    if p.returncode != 0 or not p.stdout:
+        return None
+    return np.frombuffer(p.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+def load_nl_clips(n: int = 300) -> list[tuple[np.ndarray, str]]:
+    """Streamt n bruikbare Nederlandse spraakclips (3-30 woorden, <=30s)."""
+    from datasets import Audio, load_dataset
+    ds = load_dataset(EXTERN_BRON, "dutch", split="9_hours", streaming=True)
+    ds = ds.cast_column("audio", Audio(decode=False))
+    clips: list[tuple[np.ndarray, str]] = []
+    for ex in ds:
+        tekst = (ex.get("transcript") or "").strip().lower()
+        if not 3 <= len(tekst.split()) <= 30:
+            continue
+        arr = _decode_bytes(ex["audio"]["bytes"])
+        if arr is None or not SAMPLE_RATE <= len(arr) <= 30 * SAMPLE_RATE:
+            continue
+        clips.append((arr, tekst))
+        if len(clips) >= n:
+            break
+    log.info("Openbare NL-spraak: %d clips uit %s", len(clips), EXTERN_BRON)
+    return clips
+
+
+# --------------------------------------------------------------------------- #
 # Trainer
 # --------------------------------------------------------------------------- #
 class EdgeASRTrainer:
@@ -197,19 +234,20 @@ class EdgeASRTrainer:
         assert rate == SAMPLE_RATE, f"{path}: {rate}Hz, verwacht {SAMPLE_RATE}"
         return arr
 
-    def build_dataset(self, zorg_pairs: list[tuple[str, str]]):
-        """Zet (wav, tekst)-paren om naar log-mel features + token-labels."""
+    def build_dataset(self, zorg_pairs: list[tuple[str, str]],
+                      extern_clips: list[tuple[np.ndarray, str]]):
+        """Zet (audio, tekst)-paren om naar log-mel features + token-labels."""
         from datasets import Dataset
         from transformers import WhisperProcessor
         proc = WhisperProcessor.from_pretrained(self.model_name,
                                                 language="Dutch", task="transcribe")
         feats, labels = [], []
-        for pad, tekst in zorg_pairs:
-            arr = self._load_wav(pad)
+        for arr, tekst in extern_clips + [(self._load_wav(p), t) for p, t in zorg_pairs]:
             feats.append(proc(arr, sampling_rate=SAMPLE_RATE).input_features[0])
             labels.append(proc.tokenizer(tekst).input_ids)
         ds = Dataset.from_dict({"input_features": feats, "labels": labels})
-        log.info("Trainingsset: %d zorg-voorbeelden", len(ds))
+        log.info("Trainingsset: %d voorbeelden (%d openbaar + %d zorg)",
+                 len(ds), len(extern_clips), len(zorg_pairs))
         return ds, proc
 
     def train(self, dataset, processor, minutes: int = 35) -> dict:
@@ -225,7 +263,10 @@ class EdgeASRTrainer:
 
         class Collator:
             def __call__(self, batch):
-                feats = torch.tensor(np.array([b["input_features"] for b in batch]))
+                # Expliciet float32: datasets bewaart lijsten als float64 en
+                # dat botst met fp16-training (conv1d double vs half).
+                feats = torch.tensor(np.array([b["input_features"] for b in batch],
+                                              dtype=np.float32))
                 lab = [torch.tensor(b["labels"]) for b in batch]
                 labels = torch.nn.utils.rnn.pad_sequence(lab, batch_first=True,
                                                          padding_value=-100)
@@ -294,23 +335,26 @@ class EdgeASRTrainer:
                 "mean_rtf": round(float(np.mean(rtfs)), 3)}
 
 
-def run_finetune(minutes: int = 35) -> dict:
+def run_finetune(minutes: int = 35, extern_n: int = 300) -> dict:
     """Volledige finetune-run incl. MLflow-tracking; return alle kerncijfers.
 
-    Trainingsdata is 100% synthetische zorgdata (gTTS): audio verlaat de
-    instelling nooit en er is geen externe dataset-download nodig.
+    Mix van openbare NL-spraak (MLS, conform opdracht "Common Voice of
+    vergelijkbaar") en synthetische zorg-audio; testset blijft held-out.
     """
     import mlflow
     trainer = EdgeASRTrainer()
     zorg_pairs = ZorgAudioBuilder().build()
-    dataset, proc = trainer.build_dataset(zorg_pairs)
+    extern_clips = load_nl_clips(extern_n)
+    dataset, proc = trainer.build_dataset(zorg_pairs, extern_clips)
 
     mlflow.set_experiment("edge-asr-finetune")
     with mlflow.start_run(run_name="whisper-tiny-zorgdata"):
         before = trainer.evaluate(BASE_MODEL)
         info = trainer.train(dataset, proc, minutes=minutes)
         after = trainer.evaluate(trainer.out_dir)
-        mlflow.log_params({"base_model": BASE_MODEL, "n_train": len(dataset),
+        mlflow.log_params({"base_model": BASE_MODEL, "extern_bron": EXTERN_BRON,
+                           "n_train": len(dataset), "n_zorg": len(zorg_pairs),
+                           "n_extern": len(extern_clips),
                            **{k: info[k] for k in
                               ("max_steps", "sec_per_step", "device")}})
         mlflow.log_metrics({"wer_zorg_before": before["mean_wer"],
