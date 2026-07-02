@@ -8,7 +8,7 @@
 #   bash deploy_pi.sh build    # whisper.cpp clonen (gepind) + compileren (-j2, ~15-30 min)
 #   bash deploy_pi.sh model    # HF->ggml (Windows) + scp + quantize q5_0 (Pi)
 #   bash deploy_pi.sh service  # systemd-unit installeren + starten
-#   bash deploy_pi.sh test     # health + proef-transcriptie via HTTP
+#   bash deploy_pi.sh smoke    # health + proef-transcriptie via HTTP
 #   bash deploy_pi.sh alles    # prep t/m test
 set -euo pipefail
 
@@ -57,7 +57,7 @@ model() {
     if [ ! -d "$REPO_DIR/whisper.cpp" ]; then
         git clone --depth 1 --branch "$WHISPER_TAG" https://github.com/ggml-org/whisper.cpp "$REPO_DIR/whisper.cpp"
     fi
-    if [ ! -d "$REPO_DIR/whisper.cpp/whisper-assets" ]; then
+    if [ ! -d "$REPO_DIR/whisper.cpp/whisper-openai" ]; then
         # convert-script heeft de originele OpenAI-assets (mel-filters/tokenizer) nodig.
         git clone --depth 1 https://github.com/openai/whisper "$REPO_DIR/whisper.cpp/whisper-openai" || true
     fi
@@ -96,7 +96,7 @@ EOF
     ssh "$PI" 'sudo dphys-swapfile swapoff || true'
 }
 
-test() {
+smoke() {
     curl -s -m 10 "http://$PI_HOST:8080/" >/dev/null && echo "server bereikbaar" || echo "server NIET bereikbaar"
     curl -s -m 120 "http://$PI_HOST:8080/inference" \
         -F file=@"$REPO_DIR/evidence/ref_audio/ref_00.wav" \
@@ -104,7 +104,7 @@ test() {
     echo
 }
 
-alles() { prep; build; model; service; test; }
+alles() { prep; build; model; service; smoke; }
 
 hulp() {
     sed -n '2,14p' "$0"
@@ -116,5 +116,6 @@ hulp() {
 }
 
 stap="${1:-hulp}"
-[ "$stap" = "key" ] && stap=keys   # veelgemaakte typo
+[ "$stap" = "key" ] && stap=keys    # veelgemaakte typo
+[ "$stap" = "test" ] && stap=smoke  # oude naam
 "$stap"

@@ -81,6 +81,8 @@ jobs:
             sleep 2
             curl -fsS http://localhost:8000/health && break
           done
+          # Harde eindcheck: de job moet echt falen als de container niet opkomt.
+          curl -fsS http://localhost:8000/health || { docker logs vc; exit 1; }
           docker stop vc
 
   retrain:
@@ -94,14 +96,18 @@ jobs:
       - name: Install deps
         run: |
           pip install --upgrade pip
-          pip install scikit-learn==1.5.2 pandas==2.2.3 numpy==1.26.4 \
-                      pyarrow==17.0.0 requests==2.32.3 nbconvert==7.16.6 \
-                      jupyter==1.1.1 ipykernel==6.29.5
+          pip install -r requirements.txt
+          pip install nbconvert==7.16.6 jupyter==1.1.1 ipykernel==6.29.5
       - name: Voer notebook end-to-end uit (retrain)
+        env:
+          # CI heeft geen GPU, LAN-Pi of finetune-tijd: train-guard en
+          # live-infra-cellen slaan zichzelf netjes over (zichtbaar in output).
+          VITACALL_TRAIN: "0"
+          VITACALL_LIVE: "0"
         run: |
           jupyter nbconvert --to notebook --execute main.ipynb \
                   --output main_ct_run.ipynb \
-                  --ExecutePreprocessor.timeout=1800
+                  --ExecutePreprocessor.timeout=3600
       - name: Upload modellen + notebook als artifact
         uses: actions/upload-artifact@v4
         with:

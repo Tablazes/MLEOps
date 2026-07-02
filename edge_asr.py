@@ -273,13 +273,15 @@ class EdgeASRTrainer:
                                                          padding_value=-100)
                 return {"input_features": feats, "labels": labels}
 
-        def args(steps: int) -> Seq2SeqTrainingArguments:
+        def args(steps: int, checkpoints: bool = False) -> Seq2SeqTrainingArguments:
             return Seq2SeqTrainingArguments(
                 output_dir=str(self.out_dir / "_tmp"), max_steps=steps,
                 per_device_train_batch_size=2, gradient_accumulation_steps=8,
                 learning_rate=1e-5, warmup_steps=min(50, steps // 4),
                 fp16=torch.cuda.is_available(), logging_steps=25,
-                save_strategy="no", report_to=[], remove_unused_columns=False,
+                # Checkpoint elke 40 stappen: een onderbroken run kan hervatten.
+                save_strategy="steps" if checkpoints else "no", save_steps=40,
+                save_total_limit=1, report_to=[], remove_unused_columns=False,
                 dataloader_num_workers=0, seed=42,
             )
 
@@ -293,9 +295,10 @@ class EdgeASRTrainer:
         log.info("Probe: %.1fs/stap -> max_steps=%d (budget %d min)",
                  sec_per_step, max_steps, minutes)
 
-        trainer = Seq2SeqTrainer(model=model, args=args(max_steps),
+        trainer = Seq2SeqTrainer(model=model, args=args(max_steps, checkpoints=True),
                                  train_dataset=dataset, data_collator=Collator())
-        result = trainer.train()
+        heeft_checkpoint = any((self.out_dir / "_tmp").glob("checkpoint-*"))
+        result = trainer.train(resume_from_checkpoint=heeft_checkpoint or None)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         model.config.use_cache = True
         model.save_pretrained(self.out_dir)
