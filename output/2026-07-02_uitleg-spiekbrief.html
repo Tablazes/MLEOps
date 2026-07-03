@@ -61,18 +61,21 @@ liever hard dan dat er stil vervuilde data doorstroomt (fail-fast).</div>
 <h2>Sectie 2.1 — Edge-ASR: Whisper-tiny finetune (LD3)</h2>
 <table>
 <tr><th>Wat</th><td>Whisper-tiny gefinetuned op 360 synthetische zorg-clips
-(gTTS uit domein-templates) + 300 clips Multilingual LibriSpeech NL. Encoder
-bevroren (2GB VRAM), fp16, checkpoints, tijdsbudget-probe. Held-out testset:
-20 zorg-zinnen die nooit getraind worden.</td></tr>
+(gTTS uit domein-templates) + menselijke NL-spraak: 150 FLEURS + 50 MLS.
+Encoder bevroren (2GB VRAM), fp16, checkpoints elke 80 stappen, tijdsbudget-probe.
+Held-out testset: 20 zorg-zinnen die nooit getraind worden. Het beste
+gefinetunede model draait als q5_0 op de Pi.</td></tr>
 <tr><th>Waarom niet Vosk</th><td>Eerste inlevering gebruikte Vosk-NL: een
 voorgetraind Kaldi-model dat je niet kunt bijtrainen. Precies het feedbackpunt.
 Whisper is een PyTorch-model, dus finetunen kan wel.</td></tr>
-<tr><th>Eerlijk resultaat</th><td>WER 0.293 → 0.330: de lichte finetune
-verbetert de zorg-testset <i>niet</i>. Analyse in het notebook: 100 stappen
-binnen het 35-minutenbudget is te weinig (de loss daalde nog toen de
-learning-rate al was afgebouwd) en de transcripties schuiven qua stijl op naar
-de MLS-audioboeken. We rapporteren beide metingen en benoemen wat een langere,
-zorg-zwaardere run zou moeten veranderen.</td></tr>
+<tr><th>Eerlijk resultaat</th><td>WER 0.2932 → 0.3321: de finetune haalt de
+SLA (&lt; 0.50) maar verslaat het basismodel niet. Drie runs geprobeerd met
+oplopend budget: 100 stappen (loss 6.8), 521 stappen met FLEURS-spraak
+(loss 1.81) en doortrainen met een zorg-zware mix (loss 0.19). De train-loss
+daalt gezond, maar op de schone gTTS-testset verschuift vooral de decodeerstijl:
+whisper-tiny zit daar al dicht bij zijn plafond. De checkpoint-curve staat als
+plot in 2.1; de selectie-gate hield elk slechter checkpoint uit deployment.
+Winst vraagt veld-audio met achtergrondgeluid, en die verbiedt de AVG.</td></tr>
 </table>
 <div class="vraag"><b>Je WER werd slechter — waarom lever je dat in?</b> — Omdat
 het gemeten is. Een negatief resultaat wegmoffelen of alleen het beste getal
