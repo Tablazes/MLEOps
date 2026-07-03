@@ -9,7 +9,7 @@ fastapi>=0.115.0
 uvicorn>=0.34.0
 pydantic>=2.9.2
 httpx==0.27.2
-mlflow==3.11.1
+mlflow==3.14.0
 pyspark==3.5.3
 optuna>=3.6
 matplotlib>=3.9
@@ -22,8 +22,8 @@ s3fs>=2024.6
 # torch bewust op 2.6.0: de CUDA 12.4-build waarop de finetune draaide;
 # openstaande advisories zijn low/medium en raken alleen model-load van
 # onvertrouwde bronnen (hier niet van toepassing).
-torch==2.6.0
-transformers==5.3.0
+torch==2.12.1
+transformers==5.12.1
 datasets==5.0.0
 accelerate>=1.2
 gTTS>=2.5
