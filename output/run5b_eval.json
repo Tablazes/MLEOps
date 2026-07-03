@@ -1,0 +1,22 @@
+[
+  {
+    "model": "basis",
+    "mean_wer": 0.2932,
+    "mean_rtf": 0.333
+  },
+  {
+    "model": "checkpoint-80",
+    "mean_wer": 0.3459,
+    "mean_rtf": 0.339
+  },
+  {
+    "model": "checkpoint-133",
+    "mean_wer": 0.3602,
+    "mean_rtf": 0.792
+  },
+  {
+    "model": "eind",
+    "mean_wer": 0.3602,
+    "mean_rtf": 0.347
+  }
+]
