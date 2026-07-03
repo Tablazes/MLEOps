@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Checklist-audit MLOps VitaCall — 3 juli 2026</title>
+<style>
+:root { --ok:#1a7f37; --warn:#b8860b; --fail:#c0392b; --na:#7f8c8d; --bg:#ffffff; --ink:#1c2733; --line:#d9dee4; --soft:#f4f6f8; }
+* { box-sizing:border-box; }
+body { font-family:"Segoe UI",system-ui,sans-serif; color:var(--ink); background:var(--bg); margin:0; padding:2rem; max-width:1100px; margin-inline:auto; line-height:1.5; }
+h1 { font-size:1.6rem; margin:0 0 .3rem; }
+h2 { font-size:1.2rem; border-bottom:2px solid var(--line); padding-bottom:.3rem; margin-top:2.2rem; }
+.sub { color:var(--na); margin-bottom:1.4rem; }
+table { width:100%; table-layout:fixed; border-collapse:collapse; margin:.8rem 0 1.4rem; font-size:.92rem; }
+th, td { border:1px solid var(--line); padding:.45rem .6rem; text-align:left; vertical-align:top; overflow-wrap:break-word; }
+th { background:var(--soft); }
+td.s { width:3.2rem; text-align:center; font-size:1.05rem; }
+.ok { color:var(--ok); } .warn { color:var(--warn); } .fail { color:var(--fail); } .na { color:var(--na); }
+.badge { display:inline-block; padding:.1rem .5rem; border-radius:4px; font-size:.8rem; font-weight:600; color:#fff; }
+.b-ok{background:var(--ok);} .b-warn{background:var(--warn);} .b-fail{background:var(--fail);} .b-na{background:var(--na);}
+.prop { background:var(--soft); border-left:4px solid var(--warn); padding:.7rem 1rem; margin:.6rem 0; }
+.prop b { display:block; margin-bottom:.25rem; }
+.prop ol { margin:.2rem 0 .2rem 1.2rem; padding:0; }
+.pts { font-size:1.05rem; }
+.klein { font-size:.85rem; color:var(--na); }
+button#copyjson { margin-top:2rem; padding:.6rem 1.2rem; border:1px solid var(--line); background:var(--soft); border-radius:6px; cursor:pointer; font-size:.95rem; }
+button#copyjson:hover { background:#e8ecef; }
+code { background:var(--soft); padding:.05rem .3rem; border-radius:3px; font-size:.88em; }
+</style>
+</head>
+<body>
+
+<h1>Checklist-audit — VitaCall herkansing</h1>
+<p class="sub">Stand 3 juli 2026, notebook <code>main.ipynb</code> (120 cellen), commit 2693431. Deadline: di 7 juli 23:59. Legenda: <span class="ok">✅ voldoet</span> · <span class="warn">⚠️ deels / zwak benoemd</span> · <span class="fail">❌ ontbreekt</span> · <span class="na">— n.v.t. / actie Thomas</span></p>
+
+<h2>Puntenprognose per rubric-criterium (5 × 20 pt)</h2>
+<table class="pts">
+<tr><th>Criterium</th><th>Sectie(s)</th><th>Prognose</th><th>Grootste rem</th></tr>
+<tr><td>LD1 Kwaliteit datapipeline</td><td>1.1–1.8</td><td><b>18–19</b></td><td>—</td></tr>
+<tr><td>LD2 Schaalbaarheid datapipeline</td><td>1.4–1.6, 1.9–1.11</td><td><b>17–18</b></td><td>cloud-storage is abstractie, geen echte bucket</td></tr>
+<tr><td>LD3 Modellering</td><td>2.1–2.9</td><td><b>14–17</b></td><td>finetune-winst bleef uit (run 5 loopt vannacht)</td></tr>
+<tr><td>LD4 Deployment</td><td>3.1–3.7</td><td><b>18–19</b></td><td>veilige-update-procedure (rollback/canary) niet beschreven</td></tr>
+<tr><td>LD5 Monitoring</td><td>4.1–4.7</td><td><b>18–19</b></td><td>term "concept drift" valt nergens letterlijk</td></tr>
+<tr><td><b>Totaal</b></td><td></td><td><b>85–92 / 100</b></td><td>NVD-voorwaarde = mondeling, niet het cijfer</td></tr>
+</table>
+
+<h2>0. NVD-feedback (blokkerend)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>Edge-model is echt ASR (audio → tekst)</td><td>2.1: Whisper-tiny, WER-evaluatie op 20 NL-zorgzinnen</td></tr>
+<tr><td class="s ok">✅</td><td>Edge-model gefinetuned op zorgdata</td><td>2.1: 360 gTTS-zorgzinnen + MLS; SOT-bugfix gedocumenteerd; winst nog negatief (eerlijk gerapporteerd), run 5 met FLEURS-echte-spraak loopt</td></tr>
+<tr><td class="s ok">✅</td><td>Twee onafhankelijke modellen, twee taken</td><td>ASR (edge, 2.1) + sentiment/urgentie TF-IDF+LR (cloud, 2.2–2.6)</td></tr>
+<tr><td class="s ok">✅</td><td>Cloud-deploy aantoonbaar in notebook</td><td>3.4–3.5: render.yaml, live test-call, commit-match-cel (Render /health == git HEAD)</td></tr>
+<tr><td class="s ok">✅</td><td>Edge op echte edge-infrastructuur</td><td>3.6: Raspberry Pi Zero 2 W, whisper.cpp q5_0 (28 MB), systemd MemoryMax=380M, RTF gemeten</td></tr>
+<tr><td class="s na">—</td><td>Ieder groepslid begrijpt alles</td><td>Actie Thomas: spiekbrief (<code>output/2026-07-02_uitleg-spiekbrief.html</code>) doornemen</td></tr>
+<tr><td class="s na">—</td><td>Interne kennissessie gepland</td><td>Actie Thomas: solo → oefenpresentatie hardop, vragen uit spiekbrief</td></tr>
+<tr><td class="s ok">✅</td><td>Privacy-argument logisch</td><td>Audio blijft op Pi (ASR lokaal), alleen tekst naar cloud; AVG 4× benoemd</td></tr>
+</table>
+
+<h2>1. Productvereistendocument</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs / gat</th></tr>
+<tr><td class="s ok">✅</td><td>Productoverzicht (beschrijving, doel, belang)</td><td>Sectie 0 + intro</td></tr>
+<tr><td class="s warn">⚠️</td><td>Stakeholderanalyse volledig</td><td>Stakeholders-kop bestaat, maar per stakeholder belang/eisen/invloed is dun (3 vermeldingen totaal)</td></tr>
+<tr><td class="s warn">⚠️</td><td>Datavereisten: kwaliteit/volume/velocity/privacy/security</td><td>Data-eisen-kop bestaat; accenten (0×), encryptie (0×), toegangsbeheer (1×) nauwelijks benoemd</td></tr>
+<tr><td class="s ok">✅</td><td>Modelvereisten (SLA, grootte, latency, endpoints)</td><td>Model-eisen (SLA)-kop: WER&lt;0.50, acc≥0.80, modelgrootte, RTF</td></tr>
+<tr><td class="s warn">⚠️</td><td>Operationeel onderhoud + veilige updates</td><td>Retraining-strategie ✅, drift-trigger ✅; maar rollback/canary/blue-green: 0× — terwijl de CD-gate (checksPass) feitelijk al een veilige-update-mechanisme ís</td></tr>
+<tr><td class="s warn">⚠️</td><td>Concept drift benoemd</td><td>"drift" 103×, model-kwaliteit-drift in 4.6 is de facto concept drift — de term zelf ontbreekt</td></tr>
+<tr><td class="s fail">❌</td><td>Scope en beperkingen expliciet</td><td>1 losse "Beperking"-vermelding; geen afgebakende scope-paragraaf</td></tr>
+<tr><td class="s warn">⚠️</td><td>Levend document met versiegeschiedenis</td><td>Git-historie bestaat (100+ commits) maar wordt nergens als versiegeschiedenis opgevoerd</td></tr>
+</table>
+
+<div class="prop"><b>Voorstellen §1 (alle drie zijn alleen-markdown, veilig vóór de eindrun):</b>
+<ol>
+<li><b>Scope-blok toevoegen</b> aan sectie 0: 4 regels "In scope / Buiten scope" (buiten: echte gespreksopnames wegens AVG, GPU-cluster, meertalig) + 3 beperkingen (synthetische zorgdata, Pi Zero = demonstrator, Render free tier cold start).</li>
+<li><b>Veilige-update-alinea</b> in sectie 0 én 3.4: benoem dat <code>autoDeployTrigger: checksPass</code> een release-gate is, rollback = <code>git revert</code> + automatische herdeploy, en noem canary als vervolgstap. Kost 5 regels, dekt twee checklist-items tegelijk.</li>
+<li><b>Stakeholder-tabel</b> (5 rijen × 3 kolommen: stakeholder / eis / invloed) i.p.v. de huidige losse zinnen — compacter én completer.</li>
+<li><b>Eén zin versiegeschiedenis</b>: "Dit document leeft mee in git; zie <code>git log</code> voor de revisiegeschiedenis (100+ commits sinds week 1)."</li>
+<li><b>Datavereisten aanvullen</b> met halve zin per gat: accenten/audiokwaliteit per lijn, TLS op de Render-API, SSH-key-toegang op de Pi.</li>
+</ol></div>
+
+<h2>2. Data ingestion (LD1 + LD2)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>End-to-end pipeline, beide modellen bediend</td><td>1.2–1.7: audio (gTTS/MLS) + tekst (NL-recensies); DataPipeline-klasse (OOP, docentfeedback verwerkt)</td></tr>
+<tr><td class="s ok">✅</td><td>Volume/snelheid-technieken</td><td>1.4 streaming &gt; RAM, 1.5–1.6 PySpark distributed split, batching</td></tr>
+<tr><td class="s ok">✅</td><td>Datavalidatie</td><td>1.1 + 1.3 eigen validatieklasse (schema + kwaliteitschecks)</td></tr>
+<tr><td class="s ok">✅</td><td>Opschoning + transformatie</td><td>1.3 cleaning; audio resampling 16 kHz in 2.1</td></tr>
+<tr><td class="s ok">✅</td><td>Drift-monitoring gekoppeld aan hertraining</td><td>4.3–4.6 + retraining-strategie sectie 0; hertrain 12×, retrain 16×</td></tr>
+<tr><td class="s ok">✅</td><td>Versiebeheer + reproduceerbaarheid</td><td>1.8 SHA256-manifest + rij-counts; git</td></tr>
+<tr><td class="s ok">✅</td><td>Schaalbaarheid gemeten</td><td>1.9 throughput-benchmark, 1.10 getest op 250k+ rijen, 1.11 cloud-storage-abstractie (fsspec/s3fs)</td></tr>
+<tr><td class="s warn">⚠️</td><td>Databronnen conform opdracht</td><td>Opdracht noemt Common Voice + IMDb/Sentiment140; gekozen is NL-recensies + gTTS/MLS/FLEURS. Motivatie staat er (NL-domein, Common Voice gated), maar de afwijking mag explicieter</td></tr>
+</table>
+
+<div class="prop"><b>Voorstellen §2:</b>
+<ol>
+<li><b>Bronkeuze-kader</b>: één md-blok in 1.2 "Waarom niet IMDb/Sentiment140/Common Voice": Engels vs NL-zorgcontext, Common Voice gated op datasets 5.0 (gemeten, met foutmelding als bewijs). Verdedigbaar én mondeling-goud.</li>
+<li><b>Great Expectations noemen als alternatief</b> bij 1.1 (1 zin): "eigen validatieklasse i.p.v. GE om dependencies licht te houden" — laat zien dat je het landschap kent.</li>
+</ol></div>
+
+<h2>3. Modelleren (LD3)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>Experiment-/artefact-/metric-tracking</td><td>2.8 MLflow (31×), <code>mlruns/</code> in repo; model card 2.6</td></tr>
+<tr><td class="s ok">✅</td><td>ASR-basiskeuze onderbouwd</td><td>2.1: Whisper-tiny vs Vosk-NL (grootte/WER/licentie); wav2vec2 ontbreekt in de vergelijking</td></tr>
+<tr><td class="s warn">⚠️</td><td>Finetune met before/after-winst</td><td>Eerlijk gerapporteerd: 0.2932 → 0.3295 (verslechterd; SOT-bug gevonden en gefixt, ondertraind). Run 5 (FLEURS echte spraak, 150 min) draait vannacht — grootste puntenknop</td></tr>
+<tr><td class="s ok">✅</td><td>Edge-optimalisatie gemeten</td><td>ggml q5_0: 65.6 MB → 28 MB, RTF op Pi gemeten</td></tr>
+<tr><td class="s ok">✅</td><td>Cloud-model: tuning + multi-model + metrics</td><td>2.3 5-fold CV + baseline, 2.4 grid, 2.5 vergelijking + plots, 2.6 Optuna (23×), F1/confusion aanwezig</td></tr>
+<tr><td class="s ok">✅</td><td>Reproduceerbaar</td><td>Seeds (37×), requirements.txt, config in cellen</td></tr>
+</table>
+
+<div class="prop"><b>Voorstellen §3:</b>
+<ol>
+<li><b>Run 5 verwerken</b> (fase A van het plan, morgenochtend): bij WER &lt; 0.2932 → model promoveren, Pi verversen, 2.1-verhaal wordt positief. Bij geen winst → checkpoint-curve als extra analyse-bewijs opnemen; eerlijke rapportage is rubric-verdedigbaar.</li>
+<li><b>wav2vec2 als derde optie</b> in de basiskeuze-tabel van 2.1 (1 rij: te groot voor Pi Zero, geen NL-tiny) — maakt de onderbouwing compleet.</li>
+<li><b>Debugverhaal uitspelen</b>: de SOT-dubbeltoken-bug (loss 28 → 1.8) is precies "experimenten duidelijk gedocumenteerd" op Level 4. Zorg dat de per-token-loss-analyse zichtbaar blijft na de celkrimp.</li>
+</ol></div>
+
+<h2>4. Deployment (LD4)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>Beide modellen gedeployd</td><td>Cloud: Render live (3.4–3.5). Edge: Pi Zero 2 W systemd-service (3.6)</td></tr>
+<tr><td class="s ok">✅</td><td>Edge met resource-limieten + latency</td><td>MemoryMax=380M, q5_0, RTF-meting; échte hardware, geen simulatie</td></tr>
+<tr><td class="s ok">✅</td><td>Cloud aantoonbaar in notebook</td><td>Deploy-code, endpoint, live test-request + response, commit-match</td></tr>
+<tr><td class="s ok">✅</td><td>Edge↔cloud gekoppeld end-to-end</td><td>3.6/4.2: transcript van Pi → Render-API → sentiment</td></tr>
+<tr><td class="s ok">✅</td><td>CI/CD/CT</td><td>.github/workflows/cicd.yml + CD-gate autoDeployTrigger: checksPass (bewezen werkend)</td></tr>
+<tr><td class="s ok">✅</td><td>Geautomatiseerd + Docker</td><td>Dockerfile (non-root, healthcheck), .dockerignore, deploy_pi.sh</td></tr>
+<tr><td class="s fail">❌</td><td>Veilige update-procedure beschreven</td><td>Rollback/canary/blue-green: 0 vermeldingen — het mechanisme bestaat (CD-gate) maar het verhaal ontbreekt</td></tr>
+</table>
+
+<div class="prop"><b>Voorstellen §4:</b>
+<ol>
+<li><b>Md-blok "Veilige updates" in 3.4</b> (grootste gat, 10 min werk): (a) gate: deploy alleen na groene checks; (b) rollback: <code>git revert</code> → pipeline deployt vorige versie automatisch, health-check bewaakt; (c) edge: nieuw ggml-model naast oud bestand + systemd-restart = atomair, oud bestand blijft als terugvaloptie; (d) canary expliciet benoemd als niet gedaan (één instance, free tier).</li>
+<li><b>Healthcheck als bewijs opvoeren</b>: Dockerfile-HEALTHCHECK bestaat al — één zin die hem koppelt aan "verstoring voorkomen".</li>
+</ol></div>
+
+<h2>5. Monitoren (LD5)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>Systeemmonitoring</td><td>4.4 Prometheus-style /metrics, latency, logging, psutil</td></tr>
+<tr><td class="s ok">✅</td><td>Modelmonitoring in productie</td><td>4.6 model-kwaliteit-drift, confidence-tellers</td></tr>
+<tr><td class="s ok">✅</td><td>Data-drift-detectie</td><td>4.3 PSI (13×) + KS-test op feature-niveau</td></tr>
+<tr><td class="s warn">⚠️</td><td>Concept drift benoemd</td><td>4.6 dekt het inhoudelijk; noem de term + voorbeelden (scriptwijziging, nieuw beleid, accenten)</td></tr>
+<tr><td class="s ok">✅</td><td>Alerts</td><td>4.4–4.6 alert-engine met drempels (29×)</td></tr>
+<tr><td class="s ok">✅</td><td>Dashboard</td><td>4.2/4.7 eigen dashboard-cel met live tellers + plots</td></tr>
+<tr><td class="s ok">✅</td><td>CT-loop sluitend</td><td>Drift → hertrain-trigger → CI/CD; keten beschreven in conclusie</td></tr>
+</table>
+
+<div class="prop"><b>Voorstel §5:</b>
+<ol>
+<li>In 4.6 twee zinnen: "Dit is concept drift: de relatie tussen input en label verschuift (nieuw triage-script, beleidswijziging, nieuwe accentgroepen). PSI/KS (4.3) vangt data drift; deze kwaliteits-check vangt concept drift." Rubric-woord letterlijk erin.</li>
+</ol></div>
+
+<h2>6. Notebook-vormvereisten (hard)</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Bewijs</th></tr>
+<tr><td class="s ok">✅</td><td>Eén net notebook op GitHub</td><td>main.ipynb, repo Tablazes/MLEOps</td></tr>
+<tr><td class="s ok">✅</td><td>Installs in eerste codecel</td><td>%pip install -q … (alle niet-Anaconda-libs)</td></tr>
+<tr><td class="s ok">✅</td><td>Markdown-structuur + genummerde hoofdstukken</td><td>0–4 + conclusie + bronvermelding; TOC aanwezig</td></tr>
+<tr><td class="s ok">✅</td><td>Zelf-gedefinieerde functies / OOP</td><td>DataPipeline, EdgeASRTrainer, ZorgAudioBuilder, DriftDetector-klassen</td></tr>
+<tr><td class="s ok">✅</td><td>PEP8 + comments</td><td>Docentfeedback (7.3: te weinig commentaar) verwerkt; comments recent ingekort op verzoek</td></tr>
+<tr><td class="s ok">✅</td><td>Bronvermelding (APA)</td><td>Aparte sectie: datasets + bronnen</td></tr>
+<tr><td class="s na">—</td><td>Alle groepsleden begrijpen alles</td><td>Actie Thomas (spiekbrief)</td></tr>
+</table>
+
+<h2>7. Planning en inleveren</h2>
+<table>
+<tr><th class="s">Status</th><th>Item</th><th>Toelichting</th></tr>
+<tr><td class="s na">—</td><td>Feedbackmomenten week 6/12/17</td><td>Verleden; niet meer beïnvloedbaar. Mondeling: benoem wélke feedback je verwerkt hebt (OOP, commentaar, deploy-bewijs)</td></tr>
+<tr><td class="s warn">⚠️</td><td>Herkansing aangemeld (Excel Brightspace)</td><td><b>Actie Thomas — nog niet bevestigd. Doe dit vandaag.</b></td></tr>
+<tr><td class="s ok">✅</td><td>Inleveren vóór di 7 juli 23:59</td><td>Op schema: eindrun + run 5 vannacht, fases A–D morgen, buffer van 4 dagen</td></tr>
+<tr><td class="s na">—</td><td>Presentatie voorbereid</td><td>Spiekbrief klaar; oefenen = actie Thomas</td></tr>
+</table>
+
+<h2>Samenvattend: wat nog te doen</h2>
+<table>
+<tr><th>#</th><th>Actie</th><th>Type</th><th>Effect</th></tr>
+<tr><td>1</td><td>Veilige-update-blok (rollback/gate/canary) in 3.4 + sectie 0</td><td>markdown, 10 min</td><td>dicht het enige ❌ in LD4 → 18–19 wordt haalbaar zeker</td></tr>
+<tr><td>2</td><td>Scope &amp; beperkingen-blok in sectie 0</td><td>markdown, 10 min</td><td>dicht ❌ productvereisten</td></tr>
+<tr><td>3</td><td>Concept-drift-zinnen in 4.6</td><td>markdown, 5 min</td><td>LD5 Level-4-taal compleet</td></tr>
+<tr><td>4</td><td>Stakeholder-tabel + datavereisten-aanvulling (accent, TLS, SSH-key) + versiegeschiedenis-zin</td><td>markdown, 15 min</td><td>productvereisten van ⚠️ naar ✅</td></tr>
+<tr><td>5</td><td>Bronkeuze-kader (waarom niet IMDb/Sentiment140/Common Voice) + wav2vec2-rij</td><td>markdown, 10 min</td><td>onderbouwing LD1/LD3 dicht</td></tr>
+<tr><td>6</td><td>Run 5-resultaat verwerken (fase A, morgenochtend)</td><td>gepland</td><td>LD3 14–17 → 17–19 bij winst</td></tr>
+<tr><td>7</td><td>Excel-aanmelding Brightspace + spiekbrief oefenen</td><td><b>Thomas</b></td><td>zonder dit geen herkansing / geen VD</td></tr>
+</table>
+<p class="klein">Acties 1–5 zijn puur markdown en passen in fase C (waarom-stramien) van het goedgekeurde plan — geen risico voor de lopende eindrun, één keer mee in de finale eindrun + push.</p>
+
+<button id="copyjson">Kopieer als JSON</button>
+<script>
+document.getElementById('copyjson').onclick = function () {
+  var data = {
+    datum: "2026-07-03",
+    prognose_totaal: "85-92/100",
+    per_ld: { LD1: "18-19", LD2: "17-18", LD3: "14-17 (run 5 pending)", LD4: "18-19", LD5: "18-19" },
+    gaten: [
+      "veilige-update-procedure (rollback/canary) niet beschreven — mechanisme (CD-gate) bestaat wel",
+      "scope & beperkingen niet expliciet",
+      "term 'concept drift' ontbreekt (inhoudelijk wel gedekt in 4.6)",
+      "stakeholderanalyse dun; datavereisten missen accent/encryptie/toegangsbeheer",
+      "bronkeuze-afwijking (geen IMDb/Sentiment140/Common Voice) mag explicieter onderbouwd",
+      "finetune-winst nog negatief; run 5 (FLEURS) loopt vannacht"
+    ],
+    acties_thomas: ["Excel-aanmelding Brightspace vandaag", "spiekbrief oefenen voor mondeling", "Pi-wachtwoord roteren na deadline"],
+    fix_plan: "gaten 1-5 = markdown-only, mee in fase C morgenochtend; run 5-resultaat in fase A"
+  };
+  navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(function(){
+    document.getElementById('copyjson').textContent = "Gekopieerd ✓";
+  });
+};
+</script>
+</body>
+</html>

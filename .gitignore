@@ -38,3 +38,6 @@ whisper.cpp/
 data/cv_nl/
 output/zorg_train_audio/
 *.bin
+_run5_mod/
+
+evidence/
