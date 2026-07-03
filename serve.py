@@ -27,9 +27,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 MODEL_PATH = os.environ.get("MODEL_PATH", "models/sentiment_heavy.pkl")
 
 
-# --------------------------------------------------------------------------- #
 # Domein-keywords (zorg-context)
-# --------------------------------------------------------------------------- #
 KEYWORDS_NL = {
     "urgentie": [
         "pijn op de borst", "borstpijn", "benauwd", "bewusteloos",
@@ -58,9 +56,7 @@ def predict_sentiment(model, text: str):
     return ("positief" if label_int == 1 else "negatief"), round(float(proba.max()), 3)
 
 
-# --------------------------------------------------------------------------- #
 # Monitoring: Metrics + DriftDetector (ook gebruikt door notebook-sectie 4)
-# --------------------------------------------------------------------------- #
 @dataclass
 class Metrics:
     """System- + model-counters. Een deque met maxlen werkt als ringbuffer:
@@ -119,33 +115,30 @@ class DriftDetector:
                 "drift_score": round(score, 3), "samples": n}
 
 
+# (naam, uitleg, type, bron-snapshot, key) per Prometheus-metric.
+_PROM_METRICS = [
+    ("vitacall_uptime_seconds", "Process uptime", "gauge", "metrics", "uptime_s"),
+    ("vitacall_requests_total", "Total HTTP requests", "counter", "metrics", "requests_total"),
+    ("vitacall_requests_errors_total", "Total errored requests", "counter", "metrics", "requests_errors"),
+    ("vitacall_latency_p50_ms", "p50 request latency in ms", "gauge", "metrics", "p50_ms"),
+    ("vitacall_latency_p95_ms", "p95 request latency in ms", "gauge", "metrics", "p95_ms"),
+    ("vitacall_avg_confidence", "Mean prediction confidence", "gauge", "metrics", "avg_confidence"),
+    ("vitacall_drift_score", "Output-distribution drift score", "gauge", "drift", "drift_score"),
+    ("vitacall_drift_samples", "Samples in drift window", "gauge", "drift", "samples"),
+]
+
+
 def to_prometheus_exposition(metrics_snapshot: dict, drift_snapshot: dict) -> str:
-    """Zet metrics+drift om naar Prometheus exposition-format (text/plain).
-
-    Eén HELP/TYPE/value-blok per metric, zodat een Prometheus-server dit kan
-    scrapen op /metrics-prom.
-    """
+    """Prometheus exposition-format (HELP/TYPE/value per metric) voor /metrics-prom."""
+    snaps = {"metrics": metrics_snapshot, "drift": drift_snapshot}
     lines = []
-
-    def m(name, help_text, mtype, val):
-        lines.append(f"# HELP {name} {help_text}")
-        lines.append(f"# TYPE {name} {mtype}")
-        lines.append(f"{name} {val}")
-
-    m("vitacall_uptime_seconds", "Process uptime", "gauge", metrics_snapshot.get("uptime_s", 0))
-    m("vitacall_requests_total", "Total HTTP requests", "counter", metrics_snapshot.get("requests_total", 0))
-    m("vitacall_requests_errors_total", "Total errored requests", "counter", metrics_snapshot.get("requests_errors", 0))
-    m("vitacall_latency_p50_ms", "p50 request latency in ms", "gauge", metrics_snapshot.get("p50_ms", 0))
-    m("vitacall_latency_p95_ms", "p95 request latency in ms", "gauge", metrics_snapshot.get("p95_ms", 0))
-    m("vitacall_avg_confidence", "Mean prediction confidence", "gauge", metrics_snapshot.get("avg_confidence", 0))
-    m("vitacall_drift_score", "Output-distribution drift score", "gauge", drift_snapshot.get("drift_score", 0))
-    m("vitacall_drift_samples", "Samples in drift window", "gauge", drift_snapshot.get("samples", 0))
+    for name, help_text, mtype, bron, key in _PROM_METRICS:
+        lines += [f"# HELP {name} {help_text}", f"# TYPE {name} {mtype}",
+                  f"{name} {snaps[bron].get(key, 0)}"]
     return "\n".join(lines) + "\n"
 
 
-# --------------------------------------------------------------------------- #
 # Request/response-contract
-# --------------------------------------------------------------------------- #
 class AnalyzeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=10_000)
 
