@@ -47,3 +47,5 @@ models/_run5b/
 
 output/2026-07-02_uitleg-spiekbrief.html
 output/2026-07-03_checklist-audit.html
+output/metrics_timeseries.csv
+models/_soup_live/
