@@ -1,0 +1,8 @@
+{
+  "dataset": "imdb (Maas et al. 2011, ai.stanford.edu/~amaas)",
+  "n_train": 10000,
+  "n_test": 5000,
+  "accuracy": 0.8716,
+  "f1_weighted": 0.8716,
+  "recept": "TfidfVectorizer(1-2gram, 50k) + LogisticRegression"
+}

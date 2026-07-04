@@ -1,0 +1,8 @@
+{
+  "dataset": "sentiment140 (kaggle.com/datasets/kazanova/sentiment140)",
+  "n_train": 10000,
+  "n_test": 5000,
+  "accuracy": 0.754,
+  "f1_weighted": 0.754,
+  "recept": "TfidfVectorizer(1-2gram, 50k) + LogisticRegression"
+}

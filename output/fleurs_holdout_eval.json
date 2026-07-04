@@ -1,0 +1,12 @@
+{
+  "basis": {
+    "mean_wer": 0.6342,
+    "mean_rtf": 0.317
+  },
+  "finetune": {
+    "mean_wer": 0.6538,
+    "mean_rtf": 0.474
+  },
+  "n_clips": 40,
+  "bron": "google/fleurs nl_nl test-split (menselijke sprekers, nooit getraind)"
+}
