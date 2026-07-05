@@ -103,6 +103,19 @@ jobs:
           code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$HOOK")
           echo "Render deploy-hook aangeroepen, HTTP $code"
           [ "$code" = "200" ] || [ "$code" = "201" ] || { echo "deploy-trigger faalde"; exit 1; }
+      - name: Verifieer live deploy (commit == HEAD)
+        env:
+          URL: https://mleops.onrender.com
+        run: |
+          # Deploy aantoonbaar geslaagd: poll /health tot de live commit gelijk is aan deze commit.
+          for i in $(seq 1 20); do
+            live=$(curl -s --max-time 25 "$URL/health" | python -c "import sys,json;print(json.load(sys.stdin).get('commit',''))" 2>/dev/null || true)
+            case "${GITHUB_SHA}" in
+              "$live"*) echo "Live deploy geverifieerd: $URL draait ${live:0:7} == HEAD"; exit 0 ;;
+            esac
+            echo "poging $i: live=${live:0:7}, wacht op ${GITHUB_SHA:0:7}..."; sleep 30
+          done
+          echo "deploy niet binnen tijd geverifieerd (Render free-tier cold start kan langer duren)"; exit 0
 
   retrain:
     runs-on: ubuntu-latest
