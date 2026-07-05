@@ -49,3 +49,8 @@ output/2026-07-02_uitleg-spiekbrief.html
 output/2026-07-03_checklist-audit.html
 output/metrics_timeseries.csv
 models/_soup_live/
+models/_run6/
+models/_whisper_oud_0.2852_backup/
+models/_soup_final/
+scratchpad/
+data/sentiment140_30k.parquet

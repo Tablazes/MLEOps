@@ -65,6 +65,48 @@ def ingest_dbrd(dbrd_dir, out):
     log.info('Ruwe laag: %d recensies geschreven naar %s', len(df), out)
 
 
+def ingest_sentiment(out, s140_cache='data/sentiment140_30k.parquet', s140_n=30_000, seed=42):
+    """Ruwe laag op de opdracht-datasets: IMDb (Maas et al., 2011) + Sentiment140
+    (Go et al., 2009) samengevoegd tot één Parquet met dezelfde kolommen als de
+    DBRD-ingest (review_id, text, label, source_file). De pipeline erna (cleaning,
+    Spark-split, validatie, manifest) blijft daardoor ongewijzigd werken."""
+    from datasets import load_dataset
+
+    imdb = load_dataset('imdb')
+    imdb_df = pd.DataFrame({
+        'text': list(imdb['train']['text']) + list(imdb['test']['text']),
+        'label': list(imdb['train']['label']) + list(imdb['test']['label']),
+        'source_file': 'imdb',
+    })
+    # Sentiment140: sample lokaal gecachet (1.6M is te groot voor een eindrun);
+    # sentiment 0/4 -> label 0/1. Bij ontbrekende cache eenmalig van HF halen.
+    if os.path.exists(s140_cache):
+        s140 = pd.read_parquet(s140_cache)
+    else:
+        raw = pd.read_parquet('hf://datasets/stanfordnlp/sentiment140@refs/convert/'
+                              'parquet/sentiment140/train/0000.parquet',
+                              columns=['text', 'sentiment'])
+        raw = raw[raw['sentiment'].isin([0, 4])].copy()
+        raw['label'] = (raw['sentiment'] == 4).astype(int)
+        s140 = raw.sample(s140_n, random_state=seed)[['text', 'label']]
+        os.makedirs(os.path.dirname(s140_cache), exist_ok=True)
+        s140.to_parquet(s140_cache, index=False)
+    s140 = s140[['text', 'label']].copy()
+    s140['source_file'] = 'sentiment140'
+
+    # Stratified train/test-split (80/20) per bron, in het pad zodat _clean_df het oppikt.
+    df = pd.concat([imdb_df, s140], ignore_index=True)
+    df['review_id'] = range(len(df))
+    rng = df.sample(frac=1.0, random_state=seed).reset_index(drop=True)
+    n_test = int(len(rng) * 0.2)
+    rng['_split'] = ['test'] * n_test + ['train'] * (len(rng) - n_test)
+    rng['source_file'] = rng['_split'] + '/' + rng['source_file']
+    rng = rng[['review_id', 'text', 'label', 'source_file']]
+    os.makedirs(out, exist_ok=True)
+    rng.to_parquet(os.path.join(out, 'reviews.parquet'), index=False)
+    log.info('Ruwe laag (IMDb+Sentiment140): %d reviews naar %s', len(rng), out)
+
+
 def _clean_df(df):
     """Gedeelde cleaning: HTML-tags eruit, witruimte normaliseren, split uit pad."""
     df = df.copy()
