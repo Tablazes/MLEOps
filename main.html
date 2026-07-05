@@ -8240,7 +8240,7 @@ Output Parquet: 84.0 MB
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p><strong>1.5 Trainings-laag: stratified split met PySpark</strong>: <strong>PySpark</strong> (<code>master("local[*]")</code>), zelfde code schaalt naar een cluster: <code>randomSplit</code> per label (vaste seed) + <code>unionByName</code>; <strong>stratificatie</strong> houdt de spoed-klasse in de test-set. Op Windows schrijft Spark alleen met <code>winutils.exe</code> + <code>HADOOP_HOME</code>; <code>spark_can_write()</code> checkt vooraf, geen pandas-fallback (anders RuntimeError). Eerst de bouwstenen, dan de uitvoering.</p>
 <p><strong>1.5.1 Partition-scaling</strong>: zelfde aggregatie op 1, 2, 4, 8 partities met wandtijd. Op <code>local[*]</code> CPU-bound; een cluster schaalt horizontaal.</p>
-<p><strong>1.6 Distributed split met Spark</strong>: <code>winutils</code> raakt alleen de Hadoop-IO bij het <em>wegschrijven</em>; rekenen werkt sowieso. Deze cel draait een Spark-<code>randomSplit</code> volledig in geheugen (dezelfde stratified 80/10/10 over meerdere partities). Met 1.5 dekt dat productie-route én meting dat Spark het werk doet.</p>
+<p><strong>1.6 Distributed split met Spark</strong>: <code>winutils</code> raakt alleen de Hadoop-IO bij het <em>wegschrijven</em>; rekenen werkt sowieso. Deze cel draait een Spark-<code>randomSplit</code> volledig in geheugen (dezelfde stratified 80/10/10 over meerdere partities). Met 1.5 dekt dat productie-route én meting dat Spark het werk doet. <strong>Nuance</strong>: alles draait op <code>local[*]</code> (één machine, meerdere cores); dit is niet getest op een echt multi-node cluster. De code (Spark-API, <code>unionByName</code>, partitionering) is clusterklaar, maar de horizontale schaalwinst is hier niet gemeten — dat vraagt cluster-infrastructuur die buiten scope valt.</p>
 </div>
 </div>
 </div>
@@ -9034,7 +9034,7 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="2.-Modellering-&amp;-Tracking-(LD3)">2. Modellering &amp; Tracking (LD3)<a class="anchor-link" href="#2.-Modellering-&amp;-Tracking-(LD3)">¶</a></h2><p><strong>Twee losse modellen</strong>, gescheiden geëvalueerd zodat ze los vervangbaar zijn: <strong>2.1 Edge Whisper-tiny ASR</strong> (spraak naar tekst, lokaal, tegelijk de privacy-oplossing) op WER (voor/na), grootte en RTF; <strong>2.2-2.9 Cloud sentiment/urgentie-classifier</strong> (TF-IDF + LogReg: domein-data, sweep, CV, modelvergelijking, Optuna, MLflow, FedAvg).</p>
-<p><strong>2.1 Edge-model: Whisper-tiny ASR, gefinetuned op zorgdata</strong>: de eerste inlevering gebruikte <strong>Vosk-NL</strong> (Kaldi, niet bij te trainen) — precies de feedback; <strong>Whisper</strong> is PyTorch dus finetunen kan, en wav2vec2-NL (~300M) past niet in de 512 MB van de Pi Zero. De opdracht noemt <strong>Common Voice</strong>, maar NL is gated (Mozilla-login), dus <strong>MLS + FLEURS</strong> (open NL-spraak met menselijke sprekers, "Common Voice of vergelijkbaar") plus synthetische zorg-audio (gTTS); gespreksaudio verlaat de instelling nooit. De <strong>held-out testset</strong> telt 20 referentiezinnen die nooit getraind worden (gTTS, dus WER op menselijke spraak ligt hoger; de MLS-mix beperkt overfitting op de synthetische stem). Aanvankelijk versloeg de finetune de basis-WER (0.2932) niet door een <strong>tokenlabel-bug</strong>: van de vier Whisper-prompttokens werd er maar één gestript, de andere drie lekten in de loss ("mijn moeder is gevallen" werd "mein..."). Na de fix (volledige labelsequentie, collator maskeert alleen de leidende SOT) verslaat het edge-model de basis. Met meer echte spraak (<strong>FLEURS + MLS</strong> naast de gTTS-zorg-audio) verbetert de finetune nu zowel de <strong>zorg-testset (WER 0.2932 naar 0.2552)</strong> als de <strong>FLEURS-holdout met menselijke sprekers (0.5677 naar 0.5072)</strong> (reproduceerbaar, testcel 2.9). Het winnende model is dus een directe finetune met die echte-spraak-mix, geen weight-interpolatie. De zes codecellen hierna: constanten en testzinnen, zorg-trainingszinnen, WER-harness met gTTS-synthese, openbare NL-spraak (MLS, streaming), de <code>EdgeASRTrainer</code> (dataset-bouw incl. SOT-fix, training, evaluatie) en <code>run_finetune</code> met de holdout-meting.</p>
+<p><strong>2.1 Edge-model: Whisper-tiny ASR, gefinetuned op zorgdata</strong>: de edge draait <strong>Whisper-tiny</strong> (PyTorch, finetunebaar); wav2vec2-NL (~300M) past niet in de 512 MB van de Pi Zero. De opdracht noemt <strong>Common Voice</strong>; NL daarvan is gated (Mozilla-login), dus <strong>MLS + FLEURS</strong> als open NL-spraak met menselijke sprekers ("Common Voice of vergelijkbaar") plus synthetische zorg-audio (gTTS). Gespreksaudio verlaat de instelling nooit. De <strong>held-out testset</strong> telt 20 referentiezinnen die nooit getraind worden (gTTS; WER op menselijke spraak ligt hoger, de MLS-mix beperkt overfitting op de synthetische stem). De finetune gebruikt de <strong>volledige Whisper-labelsequentie</strong>: de collator maskeert alleen de leidende SOT-prompttokens, zodat de loss uitsluitend op de doeltekst rekent. Met de echte-spraak-mix (<strong>FLEURS + MLS</strong> naast de gTTS-zorg-audio) verbetert het model zowel de <strong>zorg-testset (WER 0.2932 naar 0.2552)</strong> als de <strong>FLEURS-holdout met menselijke sprekers (0.5677 naar 0.5072)</strong> (reproduceerbaar, testcel 2.9); een directe finetune, geen weight-interpolatie. De zes codecellen hierna: constanten en testzinnen, zorg-trainingszinnen, WER-harness met gTTS-synthese, openbare NL-spraak (MLS, streaming), de <code>EdgeASRTrainer</code> (dataset-bouw, training, evaluatie) en <code>run_finetune</code> met de holdout-meting.</p>
 </div>
 </div>
 </div>
@@ -9459,9 +9459,9 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="b5ad237f-f474-4b8d-b5ca-19e8e41b62b4" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="3072c082-c08a-4a28-8902-4736a47f2b0b" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('b5ad237f-f474-4b8d-b5ca-19e8e41b62b4');
+var element = document.getElementById('3072c082-c08a-4a28-8902-4736a47f2b0b');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "f711894bb8984b6a8ef5f2bcba14a1f8", "version_major": 2, "version_minor": 0}
@@ -9629,9 +9629,9 @@ N=20  mean WER=0.2932  mean RTF=0.387
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="3b7b6489-d821-40f3-abea-d9b34270a475" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="95b2c83c-6904-4a55-b286-090ea1f74473" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('3b7b6489-d821-40f3-abea-d9b34270a475');
+var element = document.getElementById('95b2c83c-6904-4a55-b286-090ea1f74473');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "50417c80e58047f29ff33587ca89dcf2", "version_major": 2, "version_minor": 0}
@@ -9660,9 +9660,9 @@ Zorg-WER 0.2932 -&gt; 0.2552 (-0.0380)
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="c474206e-fbf1-408d-aafe-03edde163e6d" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="293b5bb4-38da-47c7-b145-1b623eae42d1" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('c474206e-fbf1-408d-aafe-03edde163e6d');
+var element = document.getElementById('293b5bb4-38da-47c7-b145-1b623eae42d1');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "11bc1d0673ed4335a4943b32e776a28c", "version_major": 2, "version_minor": 0}
@@ -9671,9 +9671,9 @@ var element = document.getElementById('c474206e-fbf1-408d-aafe-03edde163e6d');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="febf3621-32e0-44c8-a1a2-78319a004e09" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="215a719f-92a5-4410-85c4-4e8bc442d6f8" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('febf3621-32e0-44c8-a1a2-78319a004e09');
+var element = document.getElementById('215a719f-92a5-4410-85c4-4e8bc442d6f8');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "72bd5698dc3049f2ba7399e8a48ae4bf", "version_major": 2, "version_minor": 0}
@@ -9689,9 +9689,9 @@ var element = document.getElementById('febf3621-32e0-44c8-a1a2-78319a004e09');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="c12b488b-95b2-4caa-a47d-583d2a94c051" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="a32cc149-a23d-423d-8716-e356ffa4def0" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('c12b488b-95b2-4caa-a47d-583d2a94c051');
+var element = document.getElementById('a32cc149-a23d-423d-8716-e356ffa4def0');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "7dbbe35e68154b45b9ec580271c37f10", "version_major": 2, "version_minor": 0}
@@ -9700,9 +9700,9 @@ var element = document.getElementById('c12b488b-95b2-4caa-a47d-583d2a94c051');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="450458fc-7dfa-4a10-b663-ea2acb1726a8" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="1663aa08-15c7-4244-8165-3b3cee76160e" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('450458fc-7dfa-4a10-b663-ea2acb1726a8');
+var element = document.getElementById('1663aa08-15c7-4244-8165-3b3cee76160e');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "b266eab859464b80837ab133c6da3635", "version_major": 2, "version_minor": 0}
@@ -12474,7 +12474,7 @@ Alle tests geslaagd.
 </tbody>
 </table>
 <p>Modelvergelijking in 2.4-2.6 en MLflow; lite-variant en FedAvg in 2.8-2.9.</p>
-<h3 id="Reflectie-en-bewuste-keuzes">Reflectie en bewuste keuzes<a class="anchor-link" href="#Reflectie-en-bewuste-keuzes">¶</a></h3><p>Kernles (week-12-feedback): edge-model was eerst een sentiment-classifier, maar de opdracht vraagt spraak-naar-tekst — nu Whisper-tiny ASR met WER op 20 NL-zinnen. Lastigst: PySpark op Windows (zonder <code>winutils.exe</code> + <code>hadoop.dll</code> hangt <code>write.parquet()</code>); opgelost, Spark verplicht i.p.v. stille pandas-fallback. Reproduceerbaar via <code>nbconvert --execute</code>, vaste seed, SHA256-manifest.</p>
+<h3 id="Reflectie-en-bewuste-keuzes">Reflectie en bewuste keuzes<a class="anchor-link" href="#Reflectie-en-bewuste-keuzes">¶</a></h3><p>Het edge-model is een <strong>spraak-naar-tekstmodel</strong> (Whisper-tiny ASR), conform de opdracht, geëvalueerd met WER op 20 NL-referentiezinnen. Technisch was PySpark op Windows het lastigst (zonder <code>winutils.exe</code> + <code>hadoop.dll</code> hangt <code>write.parquet()</code>); opgelost, met Spark als verplichte stap i.p.v. een stille pandas-fallback. Reproduceerbaar via <code>nbconvert --execute</code>, vaste seed en SHA256-manifest.</p>
 <table>
 <thead>
 <tr>
