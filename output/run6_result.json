@@ -1,0 +1,14 @@
+{
+  "max_steps": 120,
+  "sec_per_step": 16.23,
+  "train_loss": 4.9391,
+  "train_runtime_s": 2368.2,
+  "device": "cuda",
+  "n_zorg": 360,
+  "n_extern": 500,
+  "zorg_wer": 0.2552,
+  "fleurs_basis": 0.5677,
+  "fleurs_run6": 0.5072,
+  "fleurs_wint": true,
+  "wall_s": 2929
+}

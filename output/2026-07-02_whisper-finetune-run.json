@@ -147,7 +147,9 @@
     "mean_rtf": 0.35
   },
   "after": {
-    "model": "models/whisper-tiny-vitacall-nl (run 5)",
+    "model": "weight-interpolation alpha=0.4 (Model Soup)",
+    "mean_wer": 0.2777,
+    "mean_rtf": 0.209,
     "rows": [
       {
         "wav": "ref_00.wav",
@@ -289,9 +291,7 @@
         "wer": 0.2,
         "rtf": 0.252
       }
-    ],
-    "mean_wer": 0.3321,
-    "mean_rtf": 0.209
+    ]
   },
   "train": {
     "max_steps": 521,
@@ -304,5 +304,39 @@
     "n_zorg": 360,
     "n_extern": 200,
     "extern_bron": "google/fleurs nl_nl (raw_transcription)"
-  }
+  },
+  "soup_curve": [
+    {
+      "alpha": 0.0,
+      "mean_wer": 0.2932
+    },
+    {
+      "alpha": 0.1,
+      "mean_wer": 0.2932
+    },
+    {
+      "alpha": 0.2,
+      "mean_wer": 0.2977
+    },
+    {
+      "alpha": 0.3,
+      "mean_wer": 0.2852
+    },
+    {
+      "alpha": 0.4,
+      "mean_wer": 0.2777
+    },
+    {
+      "alpha": 0.5,
+      "mean_wer": 0.2849
+    },
+    {
+      "alpha": 0.7,
+      "mean_wer": 0.2932
+    },
+    {
+      "alpha": 1.0,
+      "mean_wer": 0.3307
+    }
+  ]
 }

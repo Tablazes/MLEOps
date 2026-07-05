@@ -1,12 +1,12 @@
 {
-  "max_steps": 521,
-  "sec_per_step": 17.25,
-  "train_loss": 1.8127,
-  "train_runtime_s": 7908.9,
+  "max_steps": 120,
+  "sec_per_step": 15.55,
+  "train_loss": 3.9859,
+  "train_runtime_s": 1869.2,
   "device": "cuda",
   "n_zorg": 360,
   "n_extern": 200,
   "extern_bron": "google/fleurs nl_nl (raw_transcription)",
   "minutes_budget": 150,
-  "wall_s": 7989
+  "wall_s": 1937
 }
