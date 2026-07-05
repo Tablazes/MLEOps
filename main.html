@@ -8952,15 +8952,8 @@ StorageBackend lokaal: scheme=local  exists=True
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2.-Modellering-&amp;-Tracking-(LD3)">2. Modellering &amp; Tracking (LD3)<a class="anchor-link" href="#2.-Modellering-&amp;-Tracking-(LD3)">¶</a></h2><p><strong>Twee losse modellen</strong>, gescheiden geëvalueerd zodat ze los vervangbaar zijn: <strong>2.1 Edge Whisper-tiny ASR</strong> (spraak -&gt; tekst, lokaal; tegelijk de privacy-oplossing) op WER (voor/na), grootte en RTF; <strong>2.2-2.9 Cloud sentiment/urgentie-classifier</strong> (TF-IDF + LogReg: domein-data, sweep, CV, modelvergelijking, Optuna, MLflow, FedAvg).</p>
-<h3 id="2.1-Edge-model:-Whisper-tiny-ASR,-gefinetuned-op-zorgdata">2.1 Edge-model: Whisper-tiny ASR, gefinetuned op zorgdata<a class="anchor-link" href="#2.1-Edge-model:-Whisper-tiny-ASR,-gefinetuned-op-zorgdata">¶</a></h3><ul>
-<li><strong>Model</strong>: <code>openai/whisper-tiny</code> (39M parameters); na quantisatie (q5_0, ±28MB) op de Raspberry Pi Zero 2 W (3.6).</li>
-<li><strong>Waarom niet Vosk?</strong> De eerste inlevering gebruikte Vosk-NL (voorgetraind Kaldi, niet bij te trainen) — precies waar de feedback op viel. Whisper is een PyTorch-model, dus finetunen kan wel. wav2vec2-NL (~300M) past niet in de 512 MB van de Pi Zero.</li>
-<li><strong>Data (bewuste afwijking)</strong>: de opdracht noemt <strong>Common Voice</strong>, maar Common Voice NL staat achter een Mozilla-login (gated). Daarom <strong>MLS + FLEURS</strong> — vergelijkbare open NL-spraak met menselijke sprekers ("Common Voice of vergelijkbaar" uit de opdracht) — plus synthetische zorg-audio (gTTS). Gespreksaudio verlaat de instelling nooit.</li>
-<li><strong>Held-out testset</strong>: 20 referentiezinnen die nooit getraind worden (gTTS, dus de WER op menselijke spraak ligt hoger; de MLS-mix beperkt overfitting op de synthetische stem).</li>
-<li><strong>Resultaat (na labelfix + weight-interpolation)</strong>: eerst versloeg de finetune de basis-WER (0.2932) niet. Oorzaak: een tokenlabel-bug — van de vier Whisper-prompttokens werd er maar één gestript, de andere drie lekten in de loss ("mijn moeder is gevallen" -&gt; "mein..."). Na de fix (volledige labelsequentie, collator maskeert alleen de leidende SOT) verslaat het edge-model de basis: WER <strong>0.2932 -&gt; 0.2852</strong> (reproduceerbaar, testcel 2.9). Het model is een <strong>weight-interpolatie</strong> (Model Soup, Wortsman et al. 2022) tussen basis en finetune. Op de FLEURS-holdout (menselijke sprekers) blijft de basis beter, eerlijk gemeld.</li>
-<li><strong>Zes codecellen hierna</strong>: (1) constanten + 20 held-out testzinnen, (2) zorg-trainingszinnen via slot-filling, (3) WER-harness + gTTS-synthese, (4) openbare NL-spraak (MLS, streaming), (5) <code>EdgeASRTrainer</code> (dataset-bouw incl. SOT-fix, training, evaluatie), (6) <code>run_finetune</code>, daarna de run met holdout-meting.</li>
-</ul>
+<h2 id="2.-Modellering-&amp;-Tracking-(LD3)">2. Modellering &amp; Tracking (LD3)<a class="anchor-link" href="#2.-Modellering-&amp;-Tracking-(LD3)">¶</a></h2><p><strong>Twee losse modellen</strong>, gescheiden geëvalueerd zodat ze los vervangbaar zijn: <strong>2.1 Edge Whisper-tiny ASR</strong> (spraak naar tekst, lokaal, tegelijk de privacy-oplossing) op WER (voor/na), grootte en RTF; <strong>2.2-2.9 Cloud sentiment/urgentie-classifier</strong> (TF-IDF + LogReg: domein-data, sweep, CV, modelvergelijking, Optuna, MLflow, FedAvg).</p>
+<h3 id="2.1-Edge-model:-Whisper-tiny-ASR,-gefinetuned-op-zorgdata">2.1 Edge-model: Whisper-tiny ASR, gefinetuned op zorgdata<a class="anchor-link" href="#2.1-Edge-model:-Whisper-tiny-ASR,-gefinetuned-op-zorgdata">¶</a></h3><p>De eerste inlevering gebruikte <strong>Vosk-NL</strong> (voorgetraind Kaldi, niet bij te trainen), precies waar de feedback op viel; <strong>Whisper</strong> is een PyTorch-model dus finetunen kan wel, en wav2vec2-NL (~300M) past niet in de 512 MB van de Pi Zero. De opdracht noemt <strong>Common Voice</strong>, maar Common Voice NL is gated (Mozilla-login), dus vielen de keuze op <strong>MLS + FLEURS</strong> (vergelijkbare open NL-spraak met menselijke sprekers, "Common Voice of vergelijkbaar" uit de opdracht) plus synthetische zorg-audio (gTTS); gespreksaudio verlaat de instelling nooit. De <strong>held-out testset</strong> telt 20 referentiezinnen die nooit getraind worden (gTTS, dus de WER op menselijke spraak ligt hoger; de MLS-mix beperkt overfitting op de synthetische stem). Aanvankelijk versloeg de finetune de basis-WER (0.2932) niet door een <strong>tokenlabel-bug</strong>: van de vier Whisper-prompttokens werd er maar één gestript, de andere drie lekten in de loss ("mijn moeder is gevallen" werd "mein..."). Na de fix (volledige labelsequentie, collator maskeert alleen de leidende SOT) verslaat het edge-model de basis met <strong>WER 0.2932 naar 0.2852</strong> (reproduceerbaar, testcel 2.9); het model is een <strong>weight-interpolatie</strong> (Model Soup, Wortsman et al. 2022) tussen basis en finetune. Op de FLEURS-holdout (menselijke sprekers) blijft de basis beter, wat eerlijk gemeld wordt. De zes codecellen hierna leveren achtereenvolgens de constanten en testzinnen, de zorg-trainingszinnen, de WER-harness met gTTS-synthese, de openbare NL-spraak (MLS, streaming), de <code>EdgeASRTrainer</code> (dataset-bouw incl. SOT-fix, training, evaluatie) en <code>run_finetune</code> met de holdout-meting.</p>
 </div>
 </div>
 </div>
@@ -9302,9 +9295,9 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="e55edc9e-d157-44da-9f08-9a4302ebacc0" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="87284a5f-7bb3-45f7-b569-954e0fd60d74" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('e55edc9e-d157-44da-9f08-9a4302ebacc0');
+var element = document.getElementById('87284a5f-7bb3-45f7-b569-954e0fd60d74');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "165674a8e1554852b9e87fa02c6a1b14", "version_major": 2, "version_minor": 0}
@@ -9334,7 +9327,7 @@ N=20  mean WER=0.2932  mean RTF=0.397
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h4 id="Finetune-op-zorgdata-(reproduceerbaar,-met-tijdsbudget)">Finetune op zorgdata (reproduceerbaar, met tijdsbudget)<a class="anchor-link" href="#Finetune-op-zorgdata-(reproduceerbaar,-met-tijdsbudget)">¶</a></h4><p>Bevroren encoder (past in 2GB VRAM), lr 1e-5, checkpoints elke 40 stappen, timing-probe die <code>max_steps</code> op het tijdsbudget afstemt. Traint alleen als <code>VITACALL_TRAIN=1</code>; anders laadt de cel het eerder getrainde model + runresultaten.</p>
+<p><strong>Finetune op zorgdata</strong> (reproduceerbaar, met tijdsbudget): bevroren encoder (past in 2GB VRAM), lr 1e-5, checkpoints elke 40 stappen, timing-probe die <code>max_steps</code> op het tijdsbudget afstemt. Traint alleen als <code>VITACALL_TRAIN=1</code>; anders laadt de cel het eerder getrainde model + runresultaten.</p>
 </div>
 </div>
 </div>
@@ -9479,9 +9472,9 @@ N=20  mean WER=0.2932  mean RTF=0.397
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="32fd8b9c-4b94-49e9-9c6b-62e04c83c1a8" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="34924ed8-0534-409c-809b-e976065b59a7" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('32fd8b9c-4b94-49e9-9c6b-62e04c83c1a8');
+var element = document.getElementById('34924ed8-0534-409c-809b-e976065b59a7');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "f1947674b5d845cfafa581e34bfc0617", "version_major": 2, "version_minor": 0}
@@ -9510,9 +9503,9 @@ Zorg-WER 0.2932 -&gt; 0.2852 (-0.0080)
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="42632f61-eed5-4232-b470-f900037a4e4f" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="2cc72438-d8f0-487f-8127-5ec03613d0ae" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('42632f61-eed5-4232-b470-f900037a4e4f');
+var element = document.getElementById('2cc72438-d8f0-487f-8127-5ec03613d0ae');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "b4dce42415ea448d868dac69ceea2e0e", "version_major": 2, "version_minor": 0}
@@ -9521,9 +9514,9 @@ var element = document.getElementById('42632f61-eed5-4232-b470-f900037a4e4f');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="7c0bee00-e9f0-4617-872c-e03f054f8e19" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="0fe09d78-f025-4243-8537-c8370b5c2baa" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('7c0bee00-e9f0-4617-872c-e03f054f8e19');
+var element = document.getElementById('0fe09d78-f025-4243-8537-c8370b5c2baa');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "c3ed52a85df94ead992d0b465e14f56e", "version_major": 2, "version_minor": 0}
@@ -9539,9 +9532,9 @@ var element = document.getElementById('7c0bee00-e9f0-4617-872c-e03f054f8e19');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="8d83300c-d3aa-4aca-a178-d95758b33b11" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="155ddbc1-943e-4241-b336-880f503d389f" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('8d83300c-d3aa-4aca-a178-d95758b33b11');
+var element = document.getElementById('155ddbc1-943e-4241-b336-880f503d389f');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "60f58854d9634642becc0ab98c7d35ae", "version_major": 2, "version_minor": 0}
@@ -9550,9 +9543,9 @@ var element = document.getElementById('8d83300c-d3aa-4aca-a178-d95758b33b11');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="9fae4a86-165a-460d-be5c-4c1a09a92f98" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="bc2a862f-8b53-4e52-9363-a5d30c359494" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('9fae4a86-165a-460d-be5c-4c1a09a92f98');
+var element = document.getElementById('bc2a862f-8b53-4e52-9363-a5d30c359494');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "853891b4c7754999ace5ac9a12d3b782", "version_major": 2, "version_minor": 0}
@@ -11712,7 +11705,7 @@ vitacall_latency_p50_ms 1.46
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h4 id="Van-metrics-naar-actie">Van metrics naar actie<a class="anchor-link" href="#Van-metrics-naar-actie">¶</a></h4><p>Alert-regels eerst op een bewust ongezonde snapshot, daarna op de live tellers uit de API.</p>
+<p><strong>Van metrics naar actie</strong>: alert-regels eerst op een bewust ongezonde snapshot, daarna op de live tellers uit de API.</p>
 </div>
 </div>
 </div>
