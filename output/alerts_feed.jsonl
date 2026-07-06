@@ -1,3 +1,0 @@
-{"ts": "2026-07-05T17:07:28", "alert": "HighErrorRate", "severity": "critical", "condition": "error_rate > 5%"}
-{"ts": "2026-07-05T17:07:28", "alert": "HighLatency", "severity": "warning", "condition": "p95_latency > 500ms"}
-{"ts": "2026-07-05T17:07:28", "alert": "ModelDrift", "severity": "warning", "condition": "drift_score > 0.3"}

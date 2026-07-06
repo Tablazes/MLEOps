@@ -54,3 +54,10 @@ models/_whisper_oud_0.2852_backup/
 models/_soup_final/
 scratchpad/
 data/sentiment140_30k.parquet
+main.html
+models/sentiment_lite.json
+output/alerts_feed.jsonl
+output/*_benchmark.json
+output/*_train_info.json
+output/run6_result.json
+output/2026-07-05_fleurs-winst.json
