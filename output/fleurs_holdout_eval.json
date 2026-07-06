@@ -1,11 +1,11 @@
 {
   "basis": {
     "mean_wer": 0.6342,
-    "mean_rtf": 0.317
+    "mean_rtf": 0.298
   },
   "finetune": {
-    "mean_wer": 0.6538,
-    "mean_rtf": 0.474
+    "mean_wer": 0.6079,
+    "mean_rtf": 0.376
   },
   "n_clips": 40,
   "bron": "google/fleurs nl_nl test-split (menselijke sprekers, nooit getraind)"
