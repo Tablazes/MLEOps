@@ -1,0 +1,10 @@
+# Grafana laadt het VitaCall-dashboard automatisch uit /var/lib/grafana/dashboards.
+apiVersion: 1
+providers:
+  - name: VitaCall
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    options:
+      path: /var/lib/grafana/dashboards

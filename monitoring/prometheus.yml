@@ -1,0 +1,11 @@
+# Prometheus scrapet elke 15s de VitaCall-API /metrics-prom (Prometheus-exposition-format).
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: vitacall
+    metrics_path: /metrics-prom
+    static_configs:
+      # host.docker.internal = de lokale serve.py-host vanuit de container.
+      # Voor de live cloud: vervang door mleops.onrender.com (scheme: https).
+      - targets: ["host.docker.internal:8000"]

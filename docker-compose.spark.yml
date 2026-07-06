@@ -1,0 +1,44 @@
+# Echte gedistribueerde Spark: 1 master + 2 workers in aparte containers (Bitnami Spark 3.5).
+# Fixt LD2 boven local[*]: werk wordt over meerdere JVM-executors op losse worker-nodes verdeeld.
+#
+#   docker compose -f docker-compose.spark.yml up -d      # cluster starten
+#   $env:SPARK_MASTER_URL = "spark://localhost:7077"      # notebook laten verbinden
+#   # ... eindrun; get_spark() pakt de master op ...
+#   docker compose -f docker-compose.spark.yml down        # opruimen
+#
+# Master-UI op http://localhost:8080 toont de twee geregistreerde workers (bewijs).
+services:
+  spark-master:
+    image: bitnami/spark:3.5
+    environment:
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+    ports:
+      - "7077:7077"   # cluster-submit-poort
+      - "8080:8080"   # master web-UI (toont workers)
+    healthcheck:
+      test: ["CMD", "bash", "-c", "curl -sf http://localhost:8080 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  spark-worker-1:
+    image: bitnami/spark:3.5
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+
+  spark-worker-2:
+    image: bitnami/spark:3.5
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
