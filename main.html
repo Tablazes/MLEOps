@@ -7560,7 +7560,7 @@ h2 { border-bottom: 1px solid #d5dbe0; padding-bottom: 5px; margin-top: 34px; }
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h1 id="VitaCall,-ML-Engineering-&amp;-Ops">VitaCall, ML Engineering &amp; Ops<a class="anchor-link" href="#VitaCall,-ML-Engineering-&amp;-Ops">¶</a></h1><p>Auteur: Thomas en Parsa</p>
-<p>Alarmcentrale: operator schat ernst van een melding in seconden. <strong>Twee losse modellen</strong>: <strong>Edge Whisper-tiny ASR</strong> (spraak-&gt;tekst op Raspberry Pi Zero 2 W; ruwe audio verlaat pand nooit) en <strong>Cloud sentiment/urgentie-classifier</strong> (TF-IDF + Logistic Regression, alleen tekst, live op Render). Apart geëvalueerd (WER/RTF/grootte vs. accuracy/F1) zodat foutbron scheidbaar blijft.</p>
+<p>Bij een alarmcentrale schat de operator de ernst van een melding binnen enkele seconden in. <strong>Twee losse modellen</strong>: <strong>Edge Whisper-tiny ASR</strong> (spraak-&gt;tekst op Raspberry Pi Zero 2 W; ruwe audio verlaat pand nooit) en <strong>Cloud sentiment/urgentie-classifier</strong> (TF-IDF + Logistic Regression, alleen tekst, live op Render). Apart geëvalueerd (WER/RTF/grootte vs. accuracy/F1) zodat foutbron scheidbaar blijft.</p>
 <h2 id="0.-Productvereisten-(stakeholders,-model-eisen,-retraining)">0. Productvereisten (stakeholders, model-eisen, retraining)<a class="anchor-link" href="#0.-Productvereisten-(stakeholders,-model-eisen,-retraining)">¶</a></h2><h3 id="Stakeholders">Stakeholders<a class="anchor-link" href="#Stakeholders">¶</a></h3><table>
 <thead>
 <tr>
@@ -7879,7 +7879,7 @@ h2 { border-bottom: 1px solid #d5dbe0; padding-bottom: 5px; margin-top: 34px; }
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1.-Datapipeline-(LD1-+-LD2)">1. Datapipeline (LD1 + LD2)<a class="anchor-link" href="#1.-Datapipeline-(LD1-+-LD2)">¶</a></h2><p><strong>Drie lagen</strong>, schema-check per stap: <strong>ruw</strong> (IMDb + Sentiment140 samengevoegd, onaangeraakt), <strong>schoon</strong> (HTML/witruimte/duplicaten weg), <strong>trainklaar</strong> (80/10/10 split per label + <code>token_count</code>). Lagen apart = traceerbaar; elke <code>validate_*</code> gooit een <code>ValueError</code>.</p>
+<h2 id="1.-Datapipeline-(LD1-+-LD2)">1. Datapipeline (LD1 + LD2)<a class="anchor-link" href="#1.-Datapipeline-(LD1-+-LD2)">¶</a></h2><p><strong>Drie lagen</strong>, schema-check per stap: <strong>ruw</strong> (IMDb + Sentiment140 samengevoegd, onaangeraakt), <strong>schoon</strong> (HTML/witruimte/duplicaten weg), <strong>trainklaar</strong> (80/10/10 split per label + <code>token_count</code>). Aparte lagen houden het proces traceerbaar; elke <code>validate_*</code> gooit een <code>ValueError</code> bij afwijkingen.</p>
 <p><strong>1.1 Validatie</strong>: dataclass <code>ValidationResult</code> verzamelt per laag errors/warnings (error blokkeert). Drie gates: <code>validate_raw</code> (kolommen, label 0/1), <code>validate_clean</code> (geen lege tekst/HTML-resten), <code>validate_train_ready</code> (splits, <code>token_count</code>). <strong>Handgeschreven</strong> voor auditbaarheid; <strong>pandera</strong> in 1.3 als tweede check. Sluit af met <strong>negatieve test</strong> (slechte data, <code>assert</code> dat de gates afkeuren).</p>
 </div>
 </div>
@@ -8409,7 +8409,7 @@ dtype: int64
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>1.7 De <code>DataPipeline</code>-klasse</strong>: losse functies gebundeld in één <strong><code>DataPipeline</code>-klasse</strong> (OO-onderdeel van LD1): config in de constructor, <code>validate()</code> kiest per laag de gate. Geen dubbele logica, dezelfde <code>validate_*</code>- en cleaning-functies.</p>
+<p><strong>1.7 De <code>DataPipeline</code>-klasse</strong>: losse functies gebundeld in één <strong><code>DataPipeline</code>-klasse</strong> (OO-onderdeel van LD1): config in de constructor, <code>validate()</code> kiest per laag de gate. De klasse bevat geen dubbele logica: hij hergebruikt dezelfde <code>validate_*</code>- en cleaning-functies.</p>
 </div>
 </div>
 </div>
@@ -8915,7 +8915,7 @@ Piek-geheugen spreiding over batch-sizes: 247.0 MB (min 1534.5 / max 1781.5). Vl
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>1.10 Schaalbaarheid op 960.000 rijen</strong>: ruwe Parquet 12x geplakt (960.000 rijen), <code>clean_reviews_streaming</code> er onverkort op. Blijft piekgeheugen in dezelfde orde, dan onderbouwt dat de batchgewijze verwerking.</p>
+<p><strong>1.10 Schaalbaarheid op 960.000 rijen</strong>: ruwe Parquet 12x geplakt (960.000 rijen), <code>clean_reviews_streaming</code> er onverkort op. Blijft het piekgeheugen in dezelfde orde, dan onderbouwt dat de batchgewijze verwerking.</p>
 <p><strong>1.11 Cloud-storage-abstractie</strong>: <code>StorageBackend</code> laat dezelfde code werken op lokaal pad, <code>s3://</code>, <code>gs://</code> of Azure (fsspec kiest de driver). Drie routes: lokale read, fsspec (<code>memory://</code>, zelfde code als S3/GCS) en een <strong>live cloud-write</strong>: het manifest gaat naar Cloudflare KV achter een Worker-API en komt byte-identiek terug. De Worker-URL is de hele interface, dus geen credentials in het notebook.</p>
 </div>
 </div>
@@ -9643,9 +9643,9 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="dc0c48e1-7f2e-45f1-b6f6-e5d1ed7d24e8" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="30e41105-df81-446e-81f2-5c2cb7aa99a2" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('dc0c48e1-7f2e-45f1-b6f6-e5d1ed7d24e8');
+var element = document.getElementById('30e41105-df81-446e-81f2-5c2cb7aa99a2');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "e47bb31d94ba45929bd86478319dad52", "version_major": 2, "version_minor": 0}
@@ -9804,9 +9804,9 @@ N=20  mean WER=0.2932  mean RTF=0.365
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="6a7357f2-f041-4b72-b37e-79b2bb769b8e" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="11f61b24-6e06-4480-9481-8c330d71af5d" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('6a7357f2-f041-4b72-b37e-79b2bb769b8e');
+var element = document.getElementById('11f61b24-6e06-4480-9481-8c330d71af5d');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "4af4f2be0deb42408ea3f7aa34ea0bf8", "version_major": 2, "version_minor": 0}
@@ -9836,9 +9836,9 @@ Finetune-effect op de zorg-testset: WER 0.2932 -&gt; 0.2552 (verbeterd).
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="de7be672-902d-4df5-8863-32ac137baab2" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="a73a5909-294c-4ad0-ab90-aa33cfc23673" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('de7be672-902d-4df5-8863-32ac137baab2');
+var element = document.getElementById('a73a5909-294c-4ad0-ab90-aa33cfc23673');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "b51402be4f714a929bbd269dea4d99fb", "version_major": 2, "version_minor": 0}
@@ -9847,9 +9847,9 @@ var element = document.getElementById('de7be672-902d-4df5-8863-32ac137baab2');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="f1111f63-c4e8-45fd-8748-0733f318f86c" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="097e66ef-46a7-4851-8a95-7795f19261a4" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('f1111f63-c4e8-45fd-8748-0733f318f86c');
+var element = document.getElementById('097e66ef-46a7-4851-8a95-7795f19261a4');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "472c3662755e425ca51adfdc85a152d8", "version_major": 2, "version_minor": 0}
@@ -9865,9 +9865,9 @@ var element = document.getElementById('f1111f63-c4e8-45fd-8748-0733f318f86c');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="597e53b1-35f1-40cd-a1fa-b870b901620b" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="a5ac4484-faf4-4cd8-84d0-ee1d16ad9122" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('597e53b1-35f1-40cd-a1fa-b870b901620b');
+var element = document.getElementById('a5ac4484-faf4-4cd8-84d0-ee1d16ad9122');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "ebaed32ac57641629ecdec51d98eba6c", "version_major": 2, "version_minor": 0}
@@ -9876,9 +9876,9 @@ var element = document.getElementById('597e53b1-35f1-40cd-a1fa-b870b901620b');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="4899eab5-2165-4071-a540-62872a886659" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="732749ff-7c01-451a-a4c7-d028d0b73d77" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('4899eab5-2165-4071-a540-62872a886659');
+var element = document.getElementById('732749ff-7c01-451a-a4c7-d028d0b73d77');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "7d921baed4994c468b3f43a90186c714", "version_major": 2, "version_minor": 0}
@@ -10723,7 +10723,7 @@ tags.mlflow.runName  metrics.f1  metrics.accuracy
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Test:-modellering-(LD3)">Test: modellering (LD3)<a class="anchor-link" href="#Test:-modellering-(LD3)">¶</a></h3><p>Harde afsluittest: cloud-model ≥ 0,80 accuracy en edge-WER &lt; 0,50 (SLA). Het finetune-effect wordt gerapporteerd, niet afgedwongen: een eerlijk gemeten negatief resultaat mag de rerun niet breken (analyse in 2.1). Faalt een check, dan stopt het notebook.</p>
+<h3 id="Test:-modellering-(LD3)">Test: modellering (LD3)<a class="anchor-link" href="#Test:-modellering-(LD3)">¶</a></h3><p>Harde afsluittest: cloud-model accuracy ≥ 0.80 en edge-WER &lt; 0.50 (SLA). Het finetune-effect wordt gerapporteerd, niet afgedwongen: een eerlijk gemeten negatief resultaat mag de rerun niet breken (analyse in 2.1). Faalt een check, dan stopt het notebook.</p>
 </div>
 </div>
 </div>
@@ -11774,8 +11774,8 @@ Model-monitoring per klasse (test-set):
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>4.3 Data-drift op feature-niveau: PSI + KS-test</strong>: <strong>data drift</strong> = binnenkomende data wijkt af van de trainingsdata. Model leerde op boekentaal, krijgt gesproken spoedtaal; groter verschil = minder betrouwbare voorspelling. Gemeten op zinslengte (token-count); goedkoop, edge-draaibaar. Twee meetlatten: <strong>PSI</strong> = mate van scheefte (onder 0,1 stabiel, 0,1-0,25 lichte drift, daarboven sterk; retrain-drempel 0,20 zit bewust in de lichte band), <strong>KS-test</strong> = of de verschuiving toevallig kan zijn (p onder 0,05 = echt verschoven). Kort: <strong>PSI zegt hoevéél, KS zegt óf</strong>. Twee situaties: normaal (test vs. train), nagebootste drift (alleen korte gesprekken).</p>
-<p><strong>4.4 Prometheus-style /metrics + alert-engine</strong>: <code>/metrics-prom</code> levert Prometheus-formaat (<code># HELP</code>/<code># TYPE</code>) via <code>to_prometheus_exposition</code> uit <code>serve.py</code>; het tekstformaat dat een monitoring-systeem periodiek scrapet, elke regel een metriek met naam, type, waarde. Alert-engine, drie regels: <strong>HighErrorRate</strong> (kritiek) boven 5%, <strong>HighLatency</strong> (waarschuwing) bij p95 boven 500 ms (SLA ~50 ms), <strong>ModelDrift</strong> (waarschuwing) bij drift-score boven 0,3. Eerst een verziekt stress-scenario (alerts moeten afgaan), dan de live tellers (nul alerts). Tot slot een Grafana-dashboard (zes panels). <strong>Evidently</strong> als kruiscontrole.</p>
+<p><strong>4.3 Data-drift op feature-niveau: PSI + KS-test</strong>: <strong>data drift</strong> = binnenkomende data wijkt af van de trainingsdata. Model leerde op boekentaal, krijgt gesproken spoedtaal; groter verschil = minder betrouwbare voorspelling. Gemeten op zinslengte (token-count); goedkoop, edge-draaibaar. Twee meetlatten: <strong>PSI</strong> = mate van scheefte (onder 0.1 stabiel, 0.1-0.25 lichte drift, daarboven sterk; de retrain-drempel 0.20 zit bewust in de lichte band), <strong>KS-test</strong> = of de verschuiving toevallig kan zijn (p onder 0.05 = echt verschoven). Kort: <strong>PSI zegt hoevéél, KS zegt óf</strong>. Twee situaties: normaal (test vs. train), nagebootste drift (alleen korte gesprekken).</p>
+<p><strong>4.4 Prometheus-style /metrics + alert-engine</strong>: <code>/metrics-prom</code> levert Prometheus-formaat (<code># HELP</code>/<code># TYPE</code>) via <code>to_prometheus_exposition</code> uit <code>serve.py</code>; het tekstformaat dat een monitoring-systeem periodiek scrapet, elke regel een metriek met naam, type, waarde. Alert-engine, drie regels: <strong>HighErrorRate</strong> (kritiek) boven 5%, <strong>HighLatency</strong> (waarschuwing) bij p95 boven 500 ms (SLA ~50 ms), <strong>ModelDrift</strong> (waarschuwing) bij drift-score boven 0.3. Eerst een verziekt stress-scenario (alerts moeten afgaan), dan de live tellers (nul alerts). Tot slot een Grafana-dashboard (zes panels). <strong>Evidently</strong> als kruiscontrole.</p>
 </div>
 </div>
 </div>
@@ -12243,7 +12243,7 @@ Dashboard-definitie: 6 panels (Grafana-importeerbaar).
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>4.7 Mini-testpakket</strong>: unit-tests inline (notebook = deliverable), tegen dezelfde objecten. Dekken wat bij hertraining het eerst breekt: <strong>keyword-detectie</strong> (urgentie-/medicatietermen opgepikt, neutrale tekst niet), <strong>spoedzin-regressie</strong> ("ernstige pijn op de borst, bewusteloos" moet negatief zijn), <strong>drift-detector</strong> (<code>onvoldoende_data</code>, <code>normaal</code>, <code>drift</code>). Geen pytest: een paar <code>assert_eq</code>-aanroepen houden het notebook standalone draaibaar.</p>
+<p><strong>4.7 Mini-testpakket</strong>: unit-tests inline (notebook = deliverable), tegen dezelfde objecten. Dekken wat bij hertraining het eerst breekt: <strong>keyword-detectie</strong> (urgentie-/medicatietermen opgepikt, neutrale tekst niet), <strong>spoedzin-regressie</strong> ("ernstige pijn op de borst, bewusteloos" moet negatief zijn), <strong>drift-detector</strong> (<code>onvoldoende_data</code>, <code>normaal</code>, <code>drift</code>). Pytest is bewust weggelaten: een paar <code>assert_eq</code>-aanroepen houden het notebook standalone draaibaar.</p>
 </div>
 </div>
 </div>
@@ -12334,7 +12334,7 @@ Alle tests geslaagd.
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h2 id="Conclusie">Conclusie<a class="anchor-link" href="#Conclusie">¶</a></h2><p>Werkende keten, geen los model. Spraak op de edge (Whisper-tiny lokaal), alleen tekst naar de cloud voor sentiment + monitoring. Cloud-API live op Render, edge via whisper.cpp op een Raspberry Pi Zero 2 W; service-laag inline, identiek in de container.</p>
+<h2 id="Conclusie">Conclusie<a class="anchor-link" href="#Conclusie">¶</a></h2><p>Het eindresultaat is een werkende keten. Spraak blijft op de edge (Whisper-tiny lokaal), alleen tekst naar de cloud voor sentiment + monitoring. Cloud-API live op Render, edge via whisper.cpp op een Raspberry Pi Zero 2 W; service-laag inline, identiek in de container.</p>
 <p>Per leerdoel, met bewijs:</p>
 <table>
 <thead>
@@ -12352,7 +12352,7 @@ Alle tests geslaagd.
 </tr>
 <tr>
 <td>2 Schaalbaarheid</td>
-<td>Streaming Parquet-batches, PySpark distributed-split (verplicht), stresstest &gt;250k rijen, throughput-benchmark, fsspec cloud-storage</td>
+<td>Streaming Parquet-batches, PySpark distributed-split (verplicht), stresstest op 960.000 rijen, throughput-benchmark, fsspec cloud-storage</td>
 <td>Sectie 1.4-1.11</td>
 </tr>
 <tr>
@@ -12372,7 +12372,7 @@ Alle tests geslaagd.
 </tr>
 </tbody>
 </table>
-<p>Nieuwe dataset: opnieuw valideren, trainen, evalueren; CI/CD/CT rolt uit, monitoring meldt drift.</p>
+<p>Komt er een nieuwe dataset, dan valideert en hertraint de pipeline die automatisch; CI/CD/CT rolt de nieuwe versie uit en de monitoring meldt drift.</p>
 <h3 id="Resultaten-in-%C3%A9%C3%A9n-oogopslag">Resultaten in één oogopslag<a class="anchor-link" href="#Resultaten-in-%C3%A9%C3%A9n-oogopslag">¶</a></h3><p>Getallen uit uitgevoerde cellen:</p>
 <table>
 <thead>
