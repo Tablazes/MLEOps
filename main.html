@@ -8253,7 +8253,7 @@ Output Parquet: 84.0 MB
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><strong>1.5 Trainings-laag: stratified split met PySpark</strong>: <strong>PySpark</strong> (<code>master("local[*]")</code>), zelfde code schaalt naar een cluster: <code>randomSplit</code> per label (vaste seed) + <code>unionByName</code>; <strong>stratificatie</strong> houdt de spoed-klasse in de test-set. Op Windows schrijft Spark alleen met <code>winutils.exe</code> + <code>HADOOP_HOME</code>; <code>spark_can_write()</code> checkt vooraf, geen pandas-fallback (anders RuntimeError). Eerst de bouwstenen, dan de uitvoering.</p>
+<p><strong>1.5 Trainings-laag: stratified split met PySpark</strong>: <strong>PySpark</strong> (<code>master("local[*]")</code>), zelfde code schaalt naar een cluster: <code>randomSplit</code> per label (vaste seed) + <code>unionByName</code>; <strong>stratificatie</strong> houdt de spoed-klasse in de test-set. Op Windows schrijft Spark alleen met <code>winutils.exe</code> + <code>HADOOP_HOME</code>; <code>spark_can_write()</code> checkt dit vooraf en stopt met een RuntimeError als Spark niet kan schrijven: Spark is een verplichte stap in de pipeline. Eerst de bouwstenen, dan de uitvoering.</p>
 <p><strong>1.5.1 Partition-scaling</strong>: zelfde aggregatie op 1, 2, 4, 8 partities met wandtijd. Op <code>local[*]</code> CPU-bound; een cluster schaalt horizontaal.</p>
 <p><strong>1.6 Distributed split met Spark</strong>: <code>winutils</code> raakt alleen de Hadoop-IO bij het <em>wegschrijven</em>; rekenen werkt sowieso. Deze cel draait een Spark-<code>randomSplit</code> volledig in geheugen (dezelfde stratified 80/10/10 over meerdere partities). Met 1.5 dekt dat productie-route én meting dat Spark het werk doet. De pipeline-write draait op <code>local[*]</code> (winutils voor de Windows-IO); <strong>dezelfde code draait ook gedistribueerd</strong>: de cel hieronder voert Spark-werk uit op een <strong>echt cluster van 1 master + 2 workers</strong> (<code>docker-compose.spark.yml</code>), met de master-URL en het aantal ALIVE workers in de output als bewijs.</p>
 </div>
@@ -9643,9 +9643,9 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="85da72c7-8420-44e1-8dcc-ffa333b48592" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="4baceba2-1f6b-4184-8670-5c4b1682d1fd" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('85da72c7-8420-44e1-8dcc-ffa333b48592');
+var element = document.getElementById('4baceba2-1f6b-4184-8670-5c4b1682d1fd');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "e47bb31d94ba45929bd86478319dad52", "version_major": 2, "version_minor": 0}
@@ -9804,9 +9804,9 @@ N=20  mean WER=0.2932  mean RTF=0.365
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="35546294-0e71-4edb-b248-0b6c40d3dc20" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="67d77727-c5e9-40c9-95ba-bb02494dbe13" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('35546294-0e71-4edb-b248-0b6c40d3dc20');
+var element = document.getElementById('67d77727-c5e9-40c9-95ba-bb02494dbe13');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "4af4f2be0deb42408ea3f7aa34ea0bf8", "version_major": 2, "version_minor": 0}
@@ -9836,9 +9836,9 @@ Finetune-effect op de zorg-testset: WER 0.2932 -&gt; 0.2552 (verbeterd).
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="d5db5bf7-128b-4cdb-bd35-f0a16eea2b65" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="b1dbbefd-10b0-4168-b499-40161a9d7482" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('d5db5bf7-128b-4cdb-bd35-f0a16eea2b65');
+var element = document.getElementById('b1dbbefd-10b0-4168-b499-40161a9d7482');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "b51402be4f714a929bbd269dea4d99fb", "version_major": 2, "version_minor": 0}
@@ -9847,9 +9847,9 @@ var element = document.getElementById('d5db5bf7-128b-4cdb-bd35-f0a16eea2b65');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="47a3dbfe-b12a-4d9a-b53e-2e103d7cc665" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="35e42048-49f3-4935-9107-42055241d1a8" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('47a3dbfe-b12a-4d9a-b53e-2e103d7cc665');
+var element = document.getElementById('35e42048-49f3-4935-9107-42055241d1a8');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "472c3662755e425ca51adfdc85a152d8", "version_major": 2, "version_minor": 0}
@@ -9865,9 +9865,9 @@ var element = document.getElementById('47a3dbfe-b12a-4d9a-b53e-2e103d7cc665');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="408a0fd4-3f9f-4b75-b51d-7add28edd632" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="3caea410-6efe-41b9-94b5-a2a62d6bef04" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('408a0fd4-3f9f-4b75-b51d-7add28edd632');
+var element = document.getElementById('3caea410-6efe-41b9-94b5-a2a62d6bef04');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "ebaed32ac57641629ecdec51d98eba6c", "version_major": 2, "version_minor": 0}
@@ -9876,9 +9876,9 @@ var element = document.getElementById('408a0fd4-3f9f-4b75-b51d-7add28edd632');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="529e373a-26e8-415d-b09c-c09df42fe286" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="cfc46147-9f53-4ac1-b5b3-0427b6d158e0" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('529e373a-26e8-415d-b09c-c09df42fe286');
+var element = document.getElementById('cfc46147-9f53-4ac1-b5b3-0427b6d158e0');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "7d921baed4994c468b3f43a90186c714", "version_major": 2, "version_minor": 0}
