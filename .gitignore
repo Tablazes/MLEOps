@@ -61,3 +61,10 @@ output/*_benchmark.json
 output/*_train_info.json
 output/run6_result.json
 output/2026-07-05_fleurs-winst.json
+output/weight_interp.json
+asr_audio.py
+bench.py
+manifest.py
+seeds.py
+sentiment_data.py
+deploy_pi.sh

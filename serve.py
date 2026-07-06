@@ -87,7 +87,8 @@ class Metrics:
             "error_rate":      round(self.requests_errors / max(self.requests_total, 1), 4),
             "p50_ms":          round(s[n // 2], 2) if n else 0,
             "p95_ms":          round(s[int(n * 0.95)], 2) if n else 0,
-            "avg_confidence":  round(sum(self.confidences) / len(self.confidences), 3) if self.confidences else 0.0,
+            "avg_confidence":  (round(sum(self.confidences) / len(self.confidences), 3)
+                                if self.confidences else 0.0),
         }
 
 

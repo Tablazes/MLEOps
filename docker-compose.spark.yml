@@ -1,0 +1,27 @@
+# Echte gedistribueerde Spark: 1 master + 2 workers (apache/spark 4.0.0, matcht lokale pyspark).
+#   docker compose -f docker-compose.spark.yml up -d
+#   SPARK_MASTER_URL=spark://localhost:7077  -> get_spark() verbindt met het cluster
+#   master-UI: http://localhost:8080 (toont beide workers)
+services:
+  spark-master:
+    image: apache/spark:4.0.0
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "0.0.0.0"]
+    ports:
+      - "7077:7077"
+      - "8080:8080"
+
+  spark-worker-1:
+    image: apache/spark:4.0.0
+    depends_on: [spark-master]
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+    environment:
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
+
+  spark-worker-2:
+    image: apache/spark:4.0.0
+    depends_on: [spark-master]
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
+    environment:
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=2
