@@ -8240,7 +8240,7 @@ Output Parquet: 84.0 MB
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <p><strong>1.5 Trainings-laag: stratified split met PySpark</strong>: <strong>PySpark</strong> (<code>master("local[*]")</code>), zelfde code schaalt naar een cluster: <code>randomSplit</code> per label (vaste seed) + <code>unionByName</code>; <strong>stratificatie</strong> houdt de spoed-klasse in de test-set. Op Windows schrijft Spark alleen met <code>winutils.exe</code> + <code>HADOOP_HOME</code>; <code>spark_can_write()</code> checkt vooraf, geen pandas-fallback (anders RuntimeError). Eerst de bouwstenen, dan de uitvoering.</p>
 <p><strong>1.5.1 Partition-scaling</strong>: zelfde aggregatie op 1, 2, 4, 8 partities met wandtijd. Op <code>local[*]</code> CPU-bound; een cluster schaalt horizontaal.</p>
-<p><strong>1.6 Distributed split met Spark</strong>: <code>winutils</code> raakt alleen de Hadoop-IO bij het <em>wegschrijven</em>; rekenen werkt sowieso. Deze cel draait een Spark-<code>randomSplit</code> volledig in geheugen (dezelfde stratified 80/10/10 over meerdere partities). Met 1.5 dekt dat productie-route én meting dat Spark het werk doet. <strong>Nuance</strong>: alles draait op <code>local[*]</code> (één machine, meerdere cores); dit is niet getest op een echt multi-node cluster. De code (Spark-API, <code>unionByName</code>, partitionering) is clusterklaar, maar de horizontale schaalwinst is hier niet gemeten — dat vraagt cluster-infrastructuur die buiten scope valt. Voor échte gedistribueerde executie levert de repo <strong><code>docker-compose.spark.yml</code></strong> (Spark-master + 2 worker-nodes); met <code>SPARK_MASTER_URL=spark://localhost:7077</code> verbindt <code>get_spark()</code> met dat cluster i.p.v. <code>local[*]</code> (zelfde code, meerdere JVM-executors). De master-UI op <code>:8080</code> toont dan de twee workers.</p>
+<p><strong>1.6 Distributed split met Spark</strong>: <code>winutils</code> raakt alleen de Hadoop-IO bij het <em>wegschrijven</em>; rekenen werkt sowieso. Deze cel draait een Spark-<code>randomSplit</code> volledig in geheugen (dezelfde stratified 80/10/10 over meerdere partities). Met 1.5 dekt dat productie-route én meting dat Spark het werk doet. <strong>Nuance</strong>: alles draait op <code>local[*]</code> (één machine, meerdere cores); dit is niet getest op een echt multi-node cluster. De code (Spark-API, <code>unionByName</code>, partitionering) is clusterklaar, maar de horizontale schaalwinst is hier niet gemeten — dat vraagt cluster-infrastructuur die buiten scope valt.</p>
 </div>
 </div>
 </div>
@@ -8253,8 +8253,7 @@ Output Parquet: 84.0 MB
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">get_spark</span><span class="p">(</span><span class="n">app</span><span class="o">=</span><span class="s1">'VitaCall'</span><span class="p">):</span>
-    <span class="c1"># Cluster als SPARK_MASTER_URL gezet is (docker-compose.spark.yml: master + 2 workers),</span>
-    <span class="c1"># anders local[*]. Zelfde code, echte gedistribueerde executie zodra de cluster draait.</span>
+    <span class="c1"># Cluster als SPARK_MASTER_URL gezet is, anders local[*] (zelfde code, clusterklaar).</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">pyspark.sql</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparkSession</span>
     <span class="n">master</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'SPARK_MASTER_URL'</span><span class="p">,</span> <span class="s1">'local[*]'</span><span class="p">)</span>
     <span class="n">b</span> <span class="o">=</span> <span class="p">(</span><span class="n">SparkSession</span><span class="o">.</span><span class="n">builder</span><span class="o">.</span><span class="n">master</span><span class="p">(</span><span class="n">master</span><span class="p">)</span><span class="o">.</span><span class="n">appName</span><span class="p">(</span><span class="n">app</span><span class="p">)</span>
@@ -9463,9 +9462,9 @@ StorageBackend lokaal: scheme=local  exists=True
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="d518a0c9-0b17-4941-9586-fda6e6ea3e73" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="6cc9d728-50db-49d5-88ed-8e551d6dfa6c" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('d518a0c9-0b17-4941-9586-fda6e6ea3e73');
+var element = document.getElementById('6cc9d728-50db-49d5-88ed-8e551d6dfa6c');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "f711894bb8984b6a8ef5f2bcba14a1f8", "version_major": 2, "version_minor": 0}
@@ -9633,9 +9632,9 @@ N=20  mean WER=0.2932  mean RTF=0.387
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="64c287fd-ab11-4d3d-9472-53c261a3209b" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="824f765d-9ee0-4a0b-89f5-ef1c03084c6c" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('64c287fd-ab11-4d3d-9472-53c261a3209b');
+var element = document.getElementById('824f765d-9ee0-4a0b-89f5-ef1c03084c6c');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "50417c80e58047f29ff33587ca89dcf2", "version_major": 2, "version_minor": 0}
@@ -9664,9 +9663,9 @@ Zorg-WER 0.2932 -&gt; 0.2552 (-0.0380)
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="97170382-1e48-42ae-a0bf-3bdc0a0c8075" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="6babd8cd-aad1-463f-a155-d109cdf3aeb1" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('97170382-1e48-42ae-a0bf-3bdc0a0c8075');
+var element = document.getElementById('6babd8cd-aad1-463f-a155-d109cdf3aeb1');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "11bc1d0673ed4335a4943b32e776a28c", "version_major": 2, "version_minor": 0}
@@ -9675,9 +9674,9 @@ var element = document.getElementById('97170382-1e48-42ae-a0bf-3bdc0a0c8075');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="dfc888cd-09a7-47a9-bd38-aeff4f80ca87" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="622467b5-d3ee-49c8-8347-99b122e3b4b3" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('dfc888cd-09a7-47a9-bd38-aeff4f80ca87');
+var element = document.getElementById('622467b5-d3ee-49c8-8347-99b122e3b4b3');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "72bd5698dc3049f2ba7399e8a48ae4bf", "version_major": 2, "version_minor": 0}
@@ -9693,9 +9692,9 @@ var element = document.getElementById('dfc888cd-09a7-47a9-bd38-aeff4f80ca87');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="c8af9757-0870-4ae7-9e68-5e9f1c783d49" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="1afd8a1b-f7c9-49eb-8ab4-d1b6d9839ad9" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('c8af9757-0870-4ae7-9e68-5e9f1c783d49');
+var element = document.getElementById('1afd8a1b-f7c9-49eb-8ab4-d1b6d9839ad9');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "7dbbe35e68154b45b9ec580271c37f10", "version_major": 2, "version_minor": 0}
@@ -9704,9 +9703,9 @@ var element = document.getElementById('c8af9757-0870-4ae7-9e68-5e9f1c783d49');
 </div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jupyter-widgets jp-OutputArea-output" id="a9418ed4-155c-4289-930f-471ea9435ab6" tabindex="0">
+<div class="jupyter-widgets jp-OutputArea-output" id="cc1bf553-7c7c-4f18-8ed1-5d1b3fc9f507" tabindex="0">
 <script type="text/javascript">
-var element = document.getElementById('a9418ed4-155c-4289-930f-471ea9435ab6');
+var element = document.getElementById('cc1bf553-7c7c-4f18-8ed1-5d1b3fc9f507');
 </script>
 <script type="application/vnd.jupyter.widget-view+json">
 {"model_id": "b266eab859464b80837ab133c6da3635", "version_major": 2, "version_minor": 0}
@@ -11540,7 +11539,6 @@ active
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="4.-Monitoring-(LD5)">4. Monitoring (LD5)<a class="anchor-link" href="#4.-Monitoring-(LD5)">¶</a></h2><p>Na livegang leunt de operator op de output; scheefstand blijft onopgemerkt tot het misgaat. Drie lagen: <strong>systeem</strong> (latency, error rate, uptime; actie: schaal bij/herstart), <strong>model</strong> (verdeling voorspellingen + drift-score; actie: hertrain), <strong>logs</strong> (structured JSON, audit-spoor). <code>Metrics</code> en <code>DriftDetector</code> inline (cel 3.1, dezelfde objecten die de live API bijwerkt); <code>/metrics-prom</code> klaar voor een Prometheus-scraper (4.4).</p>
 <p><strong>4.1 Drift- en metrics-test</strong>: <code>DriftDetector</code> uit <code>serve.py</code> houdt de laatste 100 voorspellingen bij; drift-score = <code>abs(positieve_rate - 0.5)</code>, boven 0.30 = drift. Drie scenario's: <strong>te weinig data</strong> (onder <code>min_samples</code> 10 -&gt; <code>onvoldoende_data</code>), <strong>drift</strong> (20x "positief", drempel 0.1 -&gt; score 0.5), <strong>normaal</strong> (50/50 -&gt; ~0.0). Latency via <code>Metrics.measure()</code>: één traag gesprek verdwijnt in het gemiddelde maar duikt op in de p95.</p>
-<p><strong>Draaiende monitoring-stack (IaC)</strong>: <code>monitoring/docker-compose.monitoring.yml</code> start <strong>Prometheus</strong> (scrapet de <code>/metrics-prom</code> van de API) + <strong>Grafana</strong> met een geprovisioneerd <strong>VitaCall-dashboard</strong> (<code>vitacall-dashboard.json</code>: latency p50/p95, requests/errors, drift-score-gauge, confidence, uptime). Zo is het dashboard niet alleen config maar een echte, herbruikbare stack — een beoordelaar draait <code>docker compose up</code> en ziet Grafana live op <code>:3000</code>.</p>
 </div>
 </div>
 </div>
